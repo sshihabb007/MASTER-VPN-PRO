@@ -85,7 +85,7 @@
           lon: 90.41
         },
         logs: [
-          { ts: "12:18:00", cat: "SYSTEM", msg: "MASTER VPN PRO Extension v1.2.0 ready (Chrome / Brave MV3)." }
+          { ts: "12:18:00", cat: "SYSTEM", msg: "MASTER VPN PRO Extension v1.3.0 ready (Chrome / Brave MV3)." }
         ]
       },
       desktopBridge,
@@ -230,7 +230,7 @@
       sub = (st.activeNode.cityName ? st.activeNode.cityName + " • " : "") + st.activeNode.host + ":" + st.activeNode.port;
       ipShown = (st.connected && st.currentGeo && st.currentGeo.ipAddress) ? st.currentGeo.ipAddress : st.activeNode.host;
       protoShown = st.activeNode.protocol || "PROXY";
-      pingShown = (st.activeNode.pingMs || 45) + " ms";
+      pingShown = ((st.connected && st.lastPingMs) ? st.lastPingMs : (st.activeNode.pingMs || 38)) + " ms";
       targetLat = Number(st.activeNode.lat || targetLat);
       targetLon = Number(st.activeNode.lon || targetLon);
     }

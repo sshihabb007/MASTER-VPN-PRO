@@ -84,21 +84,21 @@ jobs:
       - name: Compile Windows Portable & Setup Installer via build.ps1
         shell: pwsh
         run: |
-          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.2.0' }
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.0' }
           $VerClean = $TagVer.TrimStart('v')
           powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -SkipDesktopCopy -SkipExternalNetworkProbes -Version $VerClean
 
       - name: Package Chrome & Brave Browser Extension via build-extension.ps1
         shell: pwsh
         run: |
-          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.2.0' }
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.0' }
           $VerClean = $TagVer.TrimStart('v')
           powershell -NoProfile -ExecutionPolicy Bypass -File .\build-extension.ps1 -Version $VerClean
 
       - name: Compile & Sign Android Smartphone APK via build-apk.ps1
         shell: pwsh
         run: |
-          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.2.0' }
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.0' }
           $VerClean = $TagVer.TrimStart('v')
           powershell -NoProfile -ExecutionPolicy Bypass -File .\android-app\build-apk.ps1 -Version $VerClean
 
@@ -107,7 +107,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path "release-dist" | Out-Null
 
-          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.2.0' }
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.0' }
           $VerClean = $TagVer.TrimStart('v')
 
           $PortableName = "MASTER-VPN-PRO-Portable-$VerClean.exe"
@@ -145,9 +145,9 @@ jobs:
           Official open-source multi-platform release engineered by **Mehedi Hasan Shihab**:
 
           - **Windows Setup Installer (`{{SETUP_NAME}}`)** — Graphical dark Setup Wizard with Desktop & Start Menu shortcuts, optional System Tray startup, and clean `Uninstall.exe`.
-          - **Windows Portable Edition (`{{PORTABLE_NAME}}`)** — Single-file zero-install portable `.exe` (`x64` / `ARM64` / `x86`) with 70+ live MS-SSTP countries, Private Multi-Protocol Servers (`SSTP`, `IKEv2`, `L2TP`, `PPTP`, `HTTP/HTTPS System Proxy`, `WireGuard`, `OpenVPN`), 3D Fibonacci Globe, and Local Browser Companion Bridge.
-          - **Chrome & Brave Browser Extension (`{{EXT_ZIP_NAME}}`)** — Manifest V3 extension supporting both Desktop MS-SSTP Tunnel Sync (`127.0.0.1:38195`) and Standalone Browser PAC Proxy mode, per-domain split-tunneling, WebRTC IP leak shield, and `.ovpn` export. *(Extract ZIP -> `chrome://extensions` or `brave://extensions` -> Enable Developer Mode -> Load unpacked)*.
-          - **Android Smartphone App (`{{APK_NAME}}`)** — Signed Android `.apk` (`minSdk 26`, `targetSdk 34`) powered by `android.net.VpnService`, Tunnel-Scoped Secure DNS (`Cloudflare 1.1.1.1` / `AdGuard AdBlock`), Android 10+ HTTP/HTTPS Proxy Tunneling, Android 11+ `Ikev2VpnProfile` provisioning, Per-App Split-Tunneling, 1-tap `.ovpn` export, and interactive 3D Globe.
+          - **Windows Portable Edition (`{{PORTABLE_NAME}}`)** — Single-file zero-install portable `.exe` (`x64` / `ARM64` / `x86`) featuring Parallel Direct-IP 1-RTT Lowest-Latency Gateway Racing (zero DNS timing inflation, parallel `SSTP_DUPLEX_POST` pre-flight race + kernel ICMP cross-check), 70+ live MS-SSTP countries, Private Multi-Protocol Servers (`SSTP`, `IKEv2`, `L2TP`, `PPTP`, `HTTP/HTTPS System Proxy`, `WireGuard`, `OpenVPN`), 3D Fibonacci Globe, and Local Browser Companion Bridge.
+          - **Chrome & Brave Browser Extension (`{{EXT_ZIP_NAME}}`)** — Manifest V3 extension with zero-preflight Desktop MS-SSTP Tunnel Sync (`127.0.0.1:38195`), Fail-Closed Standalone Multi-Proxy PAC (zero silent `DIRECT` IP leak), live HTTPS `CONNECT` exit verification, warm keep-alive 1-RTT latency measurement, per-domain split-tunneling, WebRTC IP leak shield, and `.ovpn` export. *(Extract ZIP -> `chrome://extensions` or `brave://extensions` -> Enable Developer Mode -> Load unpacked)*.
+          - **Android Smartphone App (`{{APK_NAME}}`)** — Signed Android `.apk` (`minSdk 26`, `targetSdk 34`) powered by `android.net.VpnService`, 16-thread Direct-IP 1-RTT live relay socket probing, Tunnel-Scoped Secure DNS (`Cloudflare 1.1.1.1` / `AdGuard AdBlock`), Android 10+ HTTP/HTTPS Proxy Tunneling, Android 11+ `Ikev2VpnProfile` provisioning, Per-App Split-Tunneling, 1-tap `.ovpn` export, and interactive 3D Globe.
 
           ### Developer
           - **Mehedi Hasan Shihab** *(Web & Software Developer)*

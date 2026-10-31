@@ -108,6 +108,7 @@ namespace ShihabShieldVpn.Core
         public double Longitude { get; set; }
         public bool IsTcp443Reachable { get; set; }
         public bool WasProbed { get; set; }
+        public bool IsLocallyProbed { get; set; }
         public bool IsSstpVerified { get; set; }
         public bool SupportsL2tpIpsec { get; set; }
 

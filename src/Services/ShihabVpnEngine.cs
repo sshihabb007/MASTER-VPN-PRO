@@ -433,6 +433,12 @@ namespace ShihabShieldVpn.Services
                 // Build candidate pool honoring Dynamic IP Rotation + same-country failover
                 List<ShihabVpnServerNode> candidatePool = BuildShihabOrderedCandidates(targetNode, fallbackCandidates, cfg);
 
+                bool explicitPinnedNode = cfg != null && !cfg.AutoSelectFastest && !string.IsNullOrWhiteSpace(cfg.SelectedServerId);
+                if (!explicitPinnedNode && candidatePool.Count > 1)
+                {
+                    candidatePool = RaceFastestShihabSstpCandidates(candidatePool, cfg, progressStatusCallback, ct);
+                }
+
                 string lastDialErr = "No responsive MS-SSTP gateway found in selected region.";
                 int dialAttemptsMade = 0;
 
@@ -446,9 +452,10 @@ namespace ShihabShieldVpn.Services
 
                     ShihabVpnServerNode candidate = candidatePool[idx];
 
-                    // Fast Pre-Flight Real MS-SSTP Handshake Check (< 1.6s) for Public Relays so we never block 22s in rasdial on dead/UDP ports!
+                    // Fast Pre-Flight Real MS-SSTP Handshake Check (< 1.5s) for Public Relays so we never block 22s in rasdial on dead/UDP ports!
                     if (candidate.SourceKind == ShihabServerSourceKind.PublicOpenRelay &&
-                        candidate.Protocol == ShihabVpnProtocol.AutoSstp)
+                        candidate.Protocol == ShihabVpnProtocol.AutoSstp &&
+                        !(candidate.IsLocallyProbed && candidate.IsSstpVerified))
                     {
                         if (progressStatusCallback != null)
                         {
@@ -461,8 +468,8 @@ namespace ShihabShieldVpn.Services
                         }
 
                         int verifiedPort;
-                        int handshakeRttMs;
-                        if (!TryVerifyWorkingShihabSstpPort(candidate, ct, out verifiedPort, out handshakeRttMs))
+                        int singleIpRttMs;
+                        if (!TryVerifyWorkingShihabSstpPort(candidate, ct, out verifiedPort, out singleIpRttMs))
                         {
                             if (!candidate.SupportsL2tpIpsec)
                             {
@@ -473,23 +480,28 @@ namespace ShihabShieldVpn.Services
                         else
                         {
                             candidate.Port = verifiedPort;
-                            if (handshakeRttMs > 0)
+                            if (singleIpRttMs > 0)
                             {
-                                candidate.PingMs = handshakeRttMs;
+                                candidate.PingMs = singleIpRttMs;
                             }
                             candidate.IsSstpVerified = true;
                             candidate.IsTcp443Reachable = true;
+                            candidate.IsLocallyProbed = true;
                             candidate.WasProbed = true;
                         }
                     }
+
+                    // Warm Windows DNS resolver cache for *.opengw.net outside latency timer so rasdial dials without cold DNS stall
+                    WarmResolveHostForRasDial(candidate.BareSstpHost, 900);
 
                     dialAttemptsMade++;
                     if (progressStatusCallback != null)
                     {
                         progressStatusCallback(string.Format(
-                            "Dialing {0} ({1})...",
+                            "Dialing fastest gateway {0} ({1} • {2} ms)...",
                             candidate.CountryLong,
-                            candidate.EffectiveDialAddress));
+                            candidate.EffectiveDialAddress,
+                            candidate.PingMs > 0 ? candidate.PingMs : 25));
                     }
 
                     ShihabResult<string> prov = ProvisionShihabPhonebookEntry(_shihabPbkPath, ShihabTunnelEntryName, candidate, cfg);
@@ -742,6 +754,168 @@ namespace ShihabShieldVpn.Services
             }
         }
 
+        private static void WarmResolveHostForRasDial(string fqdn, int maxWaitMs)
+        {
+            if (string.IsNullOrWhiteSpace(fqdn)) return;
+            IPAddress dummy;
+            if (IPAddress.TryParse(fqdn.Trim(), out dummy)) return;
+
+            try
+            {
+                Task dnsTask = Task.Run(delegate
+                {
+                    try { Dns.GetHostAddresses(fqdn.Trim()); } catch { }
+                });
+                dnsTask.Wait(Math.Max(200, maxWaitMs));
+            }
+            catch
+            {
+            }
+        }
+
+        private static List<ShihabVpnServerNode> RaceFastestShihabSstpCandidates(
+            List<ShihabVpnServerNode> pool,
+            ShihabAppConfig cfg,
+            Action<string> progressCallback,
+            CancellationToken ct)
+        {
+            if (pool == null || pool.Count <= 1)
+            {
+                return pool;
+            }
+
+            int probeCap = Math.Min(pool.Count, 18);
+            string regionLabel = pool[0] != null ? pool[0].CountryLong : "Selected Region";
+            bool isGlobalAuto = cfg != null &&
+                                cfg.AutoSelectFastest &&
+                                (string.IsNullOrWhiteSpace(cfg.SelectedCountryCode) ||
+                                 string.Equals(cfg.SelectedCountryCode, "AUTO", StringComparison.OrdinalIgnoreCase));
+            if (isGlobalAuto)
+            {
+                regionLabel = "Global Low-Latency Hubs";
+            }
+
+            if (progressCallback != null)
+            {
+                progressCallback(string.Format("Racing {0} gateways for lowest latency ({1})...", probeCap, regionLabel));
+            }
+
+            object sync = new object();
+            List<ShihabVpnServerNode> verifiedWinners = new List<ShihabVpnServerNode>();
+            List<ShihabVpnServerNode> unverifiedFallbacks = new List<ShihabVpnServerNode>();
+
+            using (SemaphoreSlim gate = new SemaphoreSlim(14))
+            {
+                List<Task> tasks = new List<Task>(probeCap);
+                for (int i = 0; i < probeCap; i++)
+                {
+                    ShihabVpnServerNode item = pool[i];
+                    if (item == null || item.SourceKind != ShihabServerSourceKind.PublicOpenRelay || item.Protocol != ShihabVpnProtocol.AutoSstp)
+                    {
+                        lock (sync)
+                        {
+                            if (item != null) verifiedWinners.Add(item);
+                        }
+                        continue;
+                    }
+
+                    tasks.Add(Task.Run(delegate
+                    {
+                        if (ct.IsCancellationRequested) return;
+                        gate.Wait();
+                        try
+                        {
+                            if (ct.IsCancellationRequested) return;
+                            int vPort;
+                            int singleIpRtt;
+                            if (VerifyShihabSstpNodeDirectIp(item, 1350, ct, out vPort, out singleIpRtt))
+                            {
+                                item.Port = vPort;
+                                if (singleIpRtt > 0)
+                                {
+                                    item.PingMs = singleIpRtt;
+                                }
+                                item.WasProbed = true;
+                                item.IsLocallyProbed = true;
+                                item.IsTcp443Reachable = true;
+                                item.IsSstpVerified = true;
+                                lock (sync)
+                                {
+                                    verifiedWinners.Add(item);
+                                }
+                            }
+                            else
+                            {
+                                item.WasProbed = true;
+                                item.IsLocallyProbed = true;
+                                item.IsTcp443Reachable = false;
+                                lock (sync)
+                                {
+                                    unverifiedFallbacks.Add(item);
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            gate.Release();
+                        }
+                    }));
+                }
+
+                try
+                {
+                    Task.WaitAll(tasks.ToArray(), 2900);
+                }
+                catch
+                {
+                }
+            }
+
+            if (verifiedWinners.Count > 0)
+            {
+                ShihabPublicRelayService.SortShihabRelays(verifiedWinners);
+                string rotCountry = isGlobalAuto
+                    ? "AUTO"
+                    : (verifiedWinners[0].CountryShort ?? "AUTO");
+                List<ShihabVpnServerNode> rotatedWinners = ShihabPublicRelayService.OrderCandidatesForShihabRotation(
+                    verifiedWinners,
+                    cfg,
+                    rotCountry);
+
+                // Cross-check exact kernel ICMP 1-RTT on the #1 winning server so local TCP socket scheduling jitter never inflates PingMs
+                ShihabVpnServerNode topWinner = rotatedWinners[0];
+                IPAddress winIp;
+                if (topWinner != null && IPAddress.TryParse(topWinner.IpAddress ?? string.Empty, out winIp))
+                {
+                    int icmpMs = ShihabPublicRelayService.MeasureIcmpEchoRttMs(winIp, 550);
+                    if (icmpMs > 0 && (topWinner.PingMs <= 0 || icmpMs < topWinner.PingMs))
+                    {
+                        topWinner.PingMs = icmpMs;
+                    }
+                }
+
+                List<ShihabVpnServerNode> finalList = new List<ShihabVpnServerNode>(pool.Count);
+                finalList.AddRange(rotatedWinners);
+                for (int i = probeCap; i < pool.Count; i++)
+                {
+                    if (pool[i] != null && !ContainsNodeId(finalList, pool[i].Id))
+                    {
+                        finalList.Add(pool[i]);
+                    }
+                }
+                for (int i = 0; i < unverifiedFallbacks.Count; i++)
+                {
+                    if (!ContainsNodeId(finalList, unverifiedFallbacks[i].Id))
+                    {
+                        finalList.Add(unverifiedFallbacks[i]);
+                    }
+                }
+                return finalList;
+            }
+
+            return pool;
+        }
+
         private static List<ShihabVpnServerNode> BuildShihabOrderedCandidates(
             ShihabVpnServerNode primary,
             IReadOnlyList<ShihabVpnServerNode> allRelays,
@@ -759,6 +933,42 @@ namespace ShihabShieldVpn.Services
             if (explicitPinnedNode)
             {
                 result.Add(primary);
+            }
+
+            bool isGlobalAuto = cfg != null &&
+                                cfg.AutoSelectFastest &&
+                                (string.IsNullOrWhiteSpace(cfg.SelectedCountryCode) ||
+                                 string.Equals(cfg.SelectedCountryCode, "AUTO", StringComparison.OrdinalIgnoreCase));
+
+            if (isGlobalAuto && !explicitPinnedNode)
+            {
+                List<ShihabVpnServerNode> globalSorted = new List<ShihabVpnServerNode>(allRelays.Count);
+                for (int i = 0; i < allRelays.Count; i++)
+                {
+                    if (allRelays[i] != null) globalSorted.Add(allRelays[i]);
+                }
+                ShihabPublicRelayService.SortShihabRelays(globalSorted);
+
+                Dictionary<string, int> perCountryCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < globalSorted.Count && result.Count < 20; i++)
+                {
+                    ShihabVpnServerNode cand = globalSorted[i];
+                    string cc = cand.CountryShort ?? "GL";
+                    int used;
+                    if (!perCountryCount.TryGetValue(cc, out used)) used = 0;
+                    if (used >= 3) continue;
+                    if (!ContainsNodeId(result, cand.Id))
+                    {
+                        perCountryCount[cc] = used + 1;
+                        result.Add(cand);
+                    }
+                }
+
+                if (!ContainsNodeId(result, primary.Id))
+                {
+                    result.Insert(0, primary);
+                }
+                return result;
             }
 
             List<ShihabVpnServerNode> sameCountry = new List<ShihabVpnServerNode>();
@@ -784,7 +994,7 @@ namespace ShihabShieldVpn.Services
                 result.Add(primary);
             }
 
-            for (int i = 0; i < rotatedSameCountry.Count && result.Count < 16; i++)
+            for (int i = 0; i < rotatedSameCountry.Count && result.Count < 20; i++)
             {
                 if (!ContainsNodeId(result, rotatedSameCountry[i].Id))
                 {
@@ -795,23 +1005,6 @@ namespace ShihabShieldVpn.Services
             if (!ContainsNodeId(result, primary.Id))
             {
                 result.Insert(0, primary);
-            }
-
-            bool isGlobalAuto = cfg != null &&
-                                cfg.AutoSelectFastest &&
-                                (string.IsNullOrWhiteSpace(cfg.SelectedCountryCode) ||
-                                 string.Equals(cfg.SelectedCountryCode, "AUTO", StringComparison.OrdinalIgnoreCase));
-
-            if (isGlobalAuto && result.Count < 6)
-            {
-                for (int i = 0; i < allRelays.Count && result.Count < 8; i++)
-                {
-                    ShihabVpnServerNode cand = allRelays[i];
-                    if (cand != null && !ContainsNodeId(result, cand.Id))
-                    {
-                        result.Add(cand);
-                    }
-                }
             }
 
             return result;
@@ -852,7 +1045,61 @@ namespace ShihabShieldVpn.Services
             c.Longitude = src.Longitude;
             c.Username = src.Username;
             c.SupportsL2tpIpsec = src.SupportsL2tpIpsec;
+            c.IsLocallyProbed = src.IsLocallyProbed;
+            c.WasProbed = src.WasProbed;
             return c;
+        }
+
+        public static bool VerifyShihabSstpNodeDirectIp(
+            ShihabVpnServerNode node,
+            int primaryTimeoutMs,
+            CancellationToken ct,
+            out int verifiedPort,
+            out int singleIpRttMs)
+        {
+            verifiedPort = node != null && node.Port > 0 ? node.Port : 443;
+            singleIpRttMs = 0;
+            if (node == null)
+            {
+                return false;
+            }
+
+            string fqdn = node.BareSstpHost;
+            if (string.IsNullOrWhiteSpace(fqdn))
+            {
+                return false;
+            }
+
+            IPAddress ipAddr;
+            if (!ShihabPublicRelayService.TryResolveEndpointIpOutsideTimer(node.IpAddress, fqdn, out ipAddr))
+            {
+                ipAddr = null;
+            }
+            else if (string.IsNullOrWhiteSpace(node.IpAddress) ||
+                     node.IpAddress.IndexOf(".opengw.net", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                node.IpAddress = ipAddr.ToString();
+            }
+
+            int primaryPort = node.Port > 0 ? node.Port : 443;
+            if (VerifySingleShihabSstpHandshakeWithIp(ipAddr, fqdn, primaryPort, primaryTimeoutMs, out singleIpRttMs))
+            {
+                verifiedPort = primaryPort;
+                return true;
+            }
+
+            if (ct.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            if (primaryPort != 443 && VerifySingleShihabSstpHandshakeWithIp(ipAddr, fqdn, 443, 1050, out singleIpRttMs))
+            {
+                verifiedPort = 443;
+                return true;
+            }
+
+            return false;
         }
 
         public static bool TryVerifyWorkingShihabSstpPort(
@@ -874,9 +1121,25 @@ namespace ShihabShieldVpn.Services
                 return false;
             }
 
-            int primaryPort = node.Port > 0 ? node.Port : 443;
-            if (VerifySingleShihabSstpHandshake(fqdn, primaryPort, 1650, out rttMs))
+            IPAddress ipAddr;
+            if (!ShihabPublicRelayService.TryResolveEndpointIpOutsideTimer(node.IpAddress, fqdn, out ipAddr))
             {
+                ipAddr = null;
+            }
+            else if (string.IsNullOrWhiteSpace(node.IpAddress) ||
+                     node.IpAddress.IndexOf(".opengw.net", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                node.IpAddress = ipAddr.ToString();
+            }
+
+            int primaryPort = node.Port > 0 ? node.Port : 443;
+            if (VerifySingleShihabSstpHandshakeWithIp(ipAddr, fqdn, primaryPort, 1650, out rttMs))
+            {
+                if (ipAddr != null)
+                {
+                    int icmpMs = ShihabPublicRelayService.MeasureIcmpEchoRttMs(ipAddr, 550);
+                    if (icmpMs > 0 && icmpMs < rttMs) rttMs = icmpMs;
+                }
                 verifiedPort = primaryPort;
                 return true;
             }
@@ -896,8 +1159,13 @@ namespace ShihabShieldVpn.Services
                 int fp = fallbackPorts[i];
                 if (fp == primaryPort) continue;
 
-                if (VerifySingleShihabSstpHandshake(fqdn, fp, 1200, out rttMs))
+                if (VerifySingleShihabSstpHandshakeWithIp(ipAddr, fqdn, fp, 1200, out rttMs))
                 {
+                    if (ipAddr != null)
+                    {
+                        int icmpMs = ShihabPublicRelayService.MeasureIcmpEchoRttMs(ipAddr, 550);
+                        if (icmpMs > 0 && icmpMs < rttMs) rttMs = icmpMs;
+                    }
                     verifiedPort = fp;
                     return true;
                 }
@@ -908,23 +1176,38 @@ namespace ShihabShieldVpn.Services
 
         public static bool VerifySingleShihabSstpHandshake(string fqdn, int port, int timeoutMs, out int rttMs)
         {
+            IPAddress ipAddr;
+            ShihabPublicRelayService.TryResolveEndpointIpOutsideTimer(null, fqdn, out ipAddr);
+            return VerifySingleShihabSstpHandshakeWithIp(ipAddr, fqdn, port, timeoutMs, out rttMs);
+        }
+
+        public static bool VerifySingleShihabSstpHandshakeWithIp(
+            IPAddress ipAddr,
+            string fqdn,
+            int port,
+            int timeoutMs,
+            out int rttMs)
+        {
             rttMs = 0;
             if (string.IsNullOrWhiteSpace(fqdn) || port <= 0 || port > 65535)
             {
                 return false;
             }
 
-            Stopwatch sw = Stopwatch.StartNew();
-            TcpClient tcp = new TcpClient();
+            TcpClient tcp = ipAddr != null ? new TcpClient(ipAddr.AddressFamily) : new TcpClient();
             try
             {
-                IAsyncResult ar = tcp.BeginConnect(fqdn.Trim(), port, null, null);
+                Stopwatch sw = Stopwatch.StartNew();
+                IAsyncResult ar = ipAddr != null
+                    ? tcp.BeginConnect(ipAddr, port, null, null)
+                    : tcp.BeginConnect(fqdn.Trim(), port, null, null);
                 if (!ar.AsyncWaitHandle.WaitOne(timeoutMs, false) || !tcp.Connected)
                 {
                     return false;
                 }
 
                 tcp.EndConnect(ar);
+                sw.Stop();
                 int tcpMs = Math.Max(1, (int)sw.ElapsedMilliseconds);
                 tcp.ReceiveTimeout = timeoutMs;
                 tcp.SendTimeout = timeoutMs;

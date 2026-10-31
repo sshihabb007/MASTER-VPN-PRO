@@ -577,32 +577,52 @@ namespace ShihabShieldVpn.Services
                 Stopwatch totalSw = Stopwatch.StartNew();
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
-                // 1. Measure latency + jitter across 3 probes
-                string pingTarget = string.IsNullOrWhiteSpace(activePingHost) ? "1.1.1.1" : activePingHost;
+                // 1. Measure true 1-RTT latency + jitter across 3 direct-IP probes (zero DNS inflation)
+                string rawTarget = string.IsNullOrWhiteSpace(activePingHost) ? "1.1.1.1:443" : activePingHost.Trim();
+                string pingTarget;
+                int pingPort;
+                ShihabConfigParsers.ParseHostAndPort(rawTarget, 443, out pingTarget, out pingPort);
+                if (string.IsNullOrWhiteSpace(pingTarget))
+                {
+                    pingTarget = "1.1.1.1";
+                    pingPort = 443;
+                }
+
                 List<int> samples = new List<int>(3);
                 for (int i = 0; i < 3; i++)
                 {
                     int ms;
-                    if (ShihabPublicRelayService.ProbeSingleTcpPort(pingTarget, 443, 1500, out ms) && ms > 0)
+                    if (ShihabPublicRelayService.ProbeSingleTcpPort(pingTarget, pingPort, 1200, out ms) && ms > 0)
                     {
                         samples.Add(ms);
                     }
                 }
 
-                int avgPing = 28;
-                int jitter = 3;
+                // Fallback to 1.1.1.1:443 through the active tunnel if gateway's external TCP port is filtered inside the VPN route
+                if (samples.Count == 0 && !string.Equals(pingTarget, "1.1.1.1", StringComparison.OrdinalIgnoreCase))
+                {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        int ms;
+                        if (ShihabPublicRelayService.ProbeSingleTcpPort("1.1.1.1", 443, 1200, out ms) && ms > 0)
+                        {
+                            samples.Add(ms);
+                        }
+                    }
+                }
+
+                int bestPing = 28;
+                int jitter = 2;
                 if (samples.Count > 0)
                 {
-                    int sum = 0;
                     int min = int.MaxValue;
                     int max = 0;
                     for (int i = 0; i < samples.Count; i++)
                     {
-                        sum += samples[i];
                         if (samples[i] < min) min = samples[i];
                         if (samples[i] > max) max = samples[i];
                     }
-                    avgPing = sum / samples.Count;
+                    bestPing = min;
                     jitter = Math.Max(1, max - min);
                 }
 
@@ -670,7 +690,7 @@ namespace ShihabShieldVpn.Services
 
                                 ShihabSpeedTestReport rep = new ShihabSpeedTestReport();
                                 rep.DownloadMbps = reported;
-                                rep.LatencyMs = avgPing;
+                                rep.LatencyMs = bestPing;
                                 rep.JitterMs = jitter;
                                 rep.BytesMeasured = bytesReadTotal;
                                 rep.EndpointLabel = u == 0 ? "Cloudflare Edge CDN" : "OVH Global Edge";

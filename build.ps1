@@ -1,7 +1,7 @@
 param(
     [switch]$SkipDesktopCopy,
     [switch]$SkipExternalNetworkProbes,
-    [string]$Version = "1.2.0"
+    [string]$Version = "1.3.0"
 )
 
 $ErrorActionPreference = "Stop"

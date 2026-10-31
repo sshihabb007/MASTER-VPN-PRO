@@ -194,7 +194,9 @@ namespace ShihabShieldVpn.Services
                     return;
                 }
 
-                string allowedCorsOrigin = IsAllowedExtensionOrigin(origin) ? origin : string.Empty;
+                string allowedCorsOrigin = IsAllowedExtensionOrigin(origin)
+                    ? origin
+                    : (string.IsNullOrEmpty(origin) ? "*" : string.Empty);
 
                 if (method == "OPTIONS")
                 {
@@ -226,7 +228,7 @@ namespace ShihabShieldVpn.Services
                         ? _callbacks.GetStatusSnapshot()
                         : new Dictionary<string, object>();
                     payload["ok"] = true;
-                    payload["bridgeVersion"] = "1.2.0";
+                    payload["bridgeVersion"] = "1.3.0";
                     WriteJsonResponse(ns, 200, "OK", allowedCorsOrigin, ser.Serialize(payload));
                     return;
                 }
@@ -301,7 +303,8 @@ namespace ShihabShieldVpn.Services
             }
             return origin.StartsWith("chrome-extension://", StringComparison.OrdinalIgnoreCase) ||
                    origin.StartsWith("moz-extension://", StringComparison.OrdinalIgnoreCase) ||
-                   origin.StartsWith("brave://", StringComparison.OrdinalIgnoreCase);
+                   origin.StartsWith("brave://", StringComparison.OrdinalIgnoreCase) ||
+                   origin.StartsWith("edge://", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string ReadField(Dictionary<string, object> d, string key)

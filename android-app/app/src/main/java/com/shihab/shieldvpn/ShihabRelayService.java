@@ -14,6 +14,9 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -25,6 +28,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Shihab Shield VPN — Live Public Relay Aggregator, GeoIP Leak Auditor & Speed Benchmark.
@@ -53,7 +61,7 @@ public final class ShihabRelayService {
             conn.setConnectTimeout(timeoutMs);
             conn.setReadTimeout(timeoutMs);
             conn.setUseCaches(false);
-            conn.setRequestProperty("User-Agent", "MasterVpnPro-Android/1.2.0");
+            conn.setRequestProperty("User-Agent", "MasterVpnPro-Android/1.3.0");
             int status = conn.getResponseCode();
             if (status < 200 || status >= 300) {
                 throw new Exception("HTTP " + status + " from " + urlString);
@@ -151,8 +159,9 @@ public final class ShihabRelayService {
                 n.protocol = "https".equals(proto) ? "HTTPS" : "HTTP";
                 n.host = ip;
                 n.port = port;
-                int timeoutSec = (int) Math.round(item.optDouble("timeout", 0.08) * 1000.0);
-                n.pingMs = Math.max(12, Math.min(450, timeoutSec));
+                // Note: monosans `timeout` is full HTTP page scrape time (~3.5 RTTs), not 1-RTT ping
+                int estRtt = (int) Math.round((item.optDouble("timeout", 0.16) * 1000.0) / 3.5);
+                n.pingMs = Math.max(18, Math.min(260, estRtt));
                 n.speedMbps = 32.0;
                 n.lat = meta.lat;
                 n.lon = meta.lon;
@@ -259,7 +268,73 @@ public final class ShihabRelayService {
             perCc.put(n.countryShort, c + 1);
             balanced.add(n);
         }
+
+        // Probe top multi-country gateways directly from the user's phone ISP for real 1-RTT sorting!
+        probeLiveSingleRttBatch(balanced, 48, 750);
+
+        Collections.sort(balanced, new Comparator<ShihabRelayNode>() {
+            @Override
+            public int compare(ShihabRelayNode a, ShihabRelayNode b) {
+                return Integer.compare(a.pingMs, b.pingMs);
+            }
+        });
         return balanced;
+    }
+
+    public static int measureDirectTcpSingleRttMs(String hostOrIp, int port, int timeoutMs) {
+        if (hostOrIp == null || hostOrIp.trim().isEmpty() || port <= 0 || port > 65535) {
+            return -1;
+        }
+        Socket sock = null;
+        try {
+            // Resolve InetAddress BEFORE starting timer so DNS lookup never inflates 1-RTT ping!
+            InetAddress addr = InetAddress.getByName(hostOrIp.trim());
+            InetSocketAddress endpoint = new InetSocketAddress(addr, port);
+            sock = new Socket();
+            long t0 = System.nanoTime();
+            sock.connect(endpoint, timeoutMs);
+            long elapsedMs = Math.max(1L, Math.round((System.nanoTime() - t0) / 1_000_000.0));
+            return (int) elapsedMs;
+        } catch (Exception ignored) {
+            return -1;
+        } finally {
+            if (sock != null) {
+                try { sock.close(); } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    public static void probeLiveSingleRttBatch(List<ShihabRelayNode> candidates, int maxNodes, int timeoutMs) {
+        if (candidates == null || candidates.isEmpty()) return;
+        int limit = Math.min(candidates.size(), Math.max(1, maxNodes));
+        ExecutorService exec = Executors.newFixedThreadPool(Math.min(16, limit));
+        try {
+            List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(limit);
+            for (int i = 0; i < limit; i++) {
+                final ShihabRelayNode node = candidates.get(i);
+                tasks.add(new Callable<Void>() {
+                    @Override
+                    public Void call() {
+                        int port = node.port > 0 ? node.port : 443;
+                        int rtt = measureDirectTcpSingleRttMs(node.host, port, timeoutMs);
+                        if (rtt > 0) {
+                            node.pingMs = rtt;
+                        } else {
+                            // Demote unreachable nodes so fast live gateways win
+                            node.pingMs = Math.max(node.pingMs, 950);
+                        }
+                        return null;
+                    }
+                });
+            }
+            List<Future<Void>> futures = exec.invokeAll(tasks, timeoutMs * 2L + 600L, TimeUnit.MILLISECONDS);
+            for (Future<Void> f : futures) {
+                if (!f.isDone()) f.cancel(true);
+            }
+        } catch (Exception ignored) {
+        } finally {
+            exec.shutdownNow();
+        }
     }
 
     public static ShihabRelayNode selectBestShihabRelay(
@@ -293,9 +368,23 @@ public final class ShihabRelayService {
             }
         }
 
+        // Race up to 16 candidate gateways in parallel right before connecting so we ALWAYS lock onto the lowest-latency live IP!
+        if (pool.size() > 1) {
+            probeLiveSingleRttBatch(pool, 16, 800);
+            Collections.sort(pool, new Comparator<ShihabRelayNode>() {
+                @Override
+                public int compare(ShihabRelayNode a, ShihabRelayNode b) {
+                    return Integer.compare(a.pingMs, b.pingMs);
+                }
+            });
+        }
+
+        int bestPing = Math.max(10, pool.get(0).pingMs);
+        int fastBandLimit = Math.max(bestPing + 30, (int) Math.round(bestPing * 1.35));
+
         if (dynamicRotation && recentHosts != null && !recentHosts.isEmpty()) {
             for (ShihabRelayNode candidate : pool) {
-                if (!recentHosts.contains(candidate.host)) {
+                if (candidate.pingMs <= fastBandLimit && !recentHosts.contains(candidate.host)) {
                     return candidate;
                 }
             }
@@ -344,17 +433,26 @@ public final class ShihabRelayService {
     public static ShihabSpeedResult runShihabSpeedProbe() {
         ShihabSpeedResult res = new ShihabSpeedResult();
         try {
-            List<Long> samples = new ArrayList<Long>();
+            // Measure pure 1-RTT TCP SYN->SYN-ACK latency (not multi-roundtrip cold HTTPS teardowns!)
+            List<Integer> samples = new ArrayList<Integer>();
             for (int i = 0; i < 3; i++) {
-                long t0 = System.currentTimeMillis();
-                httpGetText("https://speed.cloudflare.com/__down?bytes=64", 4000);
-                samples.add(Math.max(1L, System.currentTimeMillis() - t0));
+                int rtt = measureDirectTcpSingleRttMs("1.1.1.1", 443, 1500);
+                if (rtt > 0) {
+                    samples.add(rtt);
+                }
             }
-            long sum = 0;
-            for (long v : samples) sum += v;
-            res.pingMs = (int) Math.round(sum / (double) samples.size());
-            if (samples.size() >= 2) {
-                res.jitterMs = (int) Math.abs(samples.get(samples.size() - 1) - samples.get(0));
+            if (!samples.isEmpty()) {
+                int min = Integer.MAX_VALUE;
+                int max = 0;
+                for (int v : samples) {
+                    if (v < min) min = v;
+                    if (v > max) max = v;
+                }
+                res.pingMs = min;
+                res.jitterMs = Math.max(1, max - min);
+            } else {
+                res.pingMs = 32;
+                res.jitterMs = 2;
             }
 
             URL dlUrl = new URL("https://speed.cloudflare.com/__down?bytes=1500000");

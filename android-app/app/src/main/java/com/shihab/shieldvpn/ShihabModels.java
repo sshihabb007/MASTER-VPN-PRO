@@ -393,7 +393,7 @@ public final class ShihabModels {
         }
 
         public String getLogsText() {
-            return prefs.getString("activity_logs", "[SYSTEM] MASTER VPN PRO Android v1.2.0 initialized.");
+            return prefs.getString("activity_logs", "[SYSTEM] MASTER VPN PRO Android v1.3.0 initialized.");
         }
 
         public void clearLogs() {

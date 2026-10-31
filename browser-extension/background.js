@@ -5,14 +5,16 @@
 importScripts("shihab_countries.js");
 
 const SHIHAB_COMPANION_BASE = "http://127.0.0.1:38195";
-const SHIHAB_STORAGE_KEY = "shihabBrowserState_v120";
-const SHIHAB_CACHE_KEY = "shihabRelayCache_v120";
+const SHIHAB_STORAGE_KEY = "shihabBrowserState_v130";
+const SHIHAB_CACHE_KEY = "shihabRelayCache_v130";
 
 const SHIHAB_MONOSANS_URL = "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies.json";
 const SHIHAB_PROXIFLY_HTTPS_URL = "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/https/data.json";
+const SHIHAB_VAKHOV_FRESH_URL = "https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/proxylist.json";
 const SHIHAB_OVPN_POOL_URL = "https://raw.githubusercontent.com/ipspeed/ipsec/master/server.json";
 
 let shihabAuthCredsInMemory = null; // { host, port, username, password }
+const shihabDeadProxyUntilMs = new Map(); // "host:port" -> timestampMs
 
 function createDefaultShihabState() {
   return {
@@ -40,7 +42,7 @@ function createDefaultShihabState() {
       {
         ts: formatNowClock(),
         cat: "SYSTEM",
-        msg: "MASTER VPN PRO Extension v1.2.0 ready (Chrome / Brave MV3)."
+        msg: "MASTER VPN PRO Extension v1.3.0 ready (Chrome / Brave MV3)."
       }
     ]
   };
@@ -115,13 +117,14 @@ async function fetchWithTimeout(url, options, timeoutMs) {
 }
 
 // =========================================================================
-// 1. DESKTOP COMPANION BRIDGE (127.0.0.1:38195 -> ShihabShieldVPN.exe)
+// 1. DESKTOP COMPANION BRIDGE (127.0.0.1:38195 -> MasterVpnPro.exe)
 // =========================================================================
 async function queryShihabDesktopBridgeStatus() {
   try {
+    // Simple GET without custom headers avoids CORS/PNA OPTIONS preflight delays in Chrome & Brave
     const resp = await fetchWithTimeout(
       SHIHAB_COMPANION_BASE + "/api/shihab/status",
-      { headers: { "X-Shihab-Client": "ShihabShieldBrowserExt" } },
+      {},
       850
     );
     if (!resp.ok) return null;
@@ -136,7 +139,7 @@ async function queryShihabDesktopBridgeCatalog() {
   try {
     const resp = await fetchWithTimeout(
       SHIHAB_COMPANION_BASE + "/api/shihab/countries",
-      { headers: { "X-Shihab-Client": "ShihabShieldBrowserExt" } },
+      {},
       1200
     );
     if (!resp.ok) return null;
@@ -173,61 +176,9 @@ async function refreshShihabStandaloneCatalog(state) {
   const proxyMap = new Map();
   let ovpnRelays = [];
 
-  // Source A: Monosans verified geolocation proxies (SOCKS5 / SOCKS4 / HTTP with RTT)
+  // Source A: Proxifly HTTPS-CONNECT capable proxies (highest browser TLS compatibility)
   try {
-    const rMono = await fetchWithTimeout(SHIHAB_MONOSANS_URL, {}, 8000);
-    if (rMono.ok) {
-      const arr = await rMono.json();
-      if (Array.isArray(arr)) {
-        for (let i = 0; i < arr.length; i++) {
-          const item = arr[i];
-          if (!item || !item.host || !item.port) continue;
-          const protoRaw = String(item.protocol || "http").toLowerCase();
-          if (protoRaw !== "socks5" && protoRaw !== "http" && protoRaw !== "socks4") continue;
-
-          let cc = (item.geolocation && item.geolocation.country && item.geolocation.country.iso_code) || "GL";
-          cc = String(cc).toUpperCase();
-          if (cc === "UK") cc = "GB";
-          if (!cc || cc === "GL") continue;
-
-          const meta = resolveShihabCountryMeta(cc);
-          const pingMs = item.timeout ? Math.max(8, Math.min(900, Math.round(Number(item.timeout) * 1000))) : 85;
-          const key = protoRaw + "://" + item.host + ":" + item.port;
-          if (proxyMap.has(key)) continue;
-
-          const pacDir = protoRaw === "socks5"
-            ? ("SOCKS5 " + item.host + ":" + item.port + "; SOCKS " + item.host + ":" + item.port)
-            : (protoRaw === "socks4"
-              ? ("SOCKS4 " + item.host + ":" + item.port + "; SOCKS " + item.host + ":" + item.port)
-              : ("PROXY " + item.host + ":" + item.port));
-
-          proxyMap.set(key, {
-            id: "pub_px_" + item.host.replace(/[^a-zA-Z0-9]/g, "_") + "_" + item.port,
-            sourceKind: "public_proxy",
-            protocol: protoRaw.toUpperCase(),
-            pacDirective: pacDir,
-            host: String(item.host),
-            port: Number(item.port),
-            countryShort: cc,
-            countryLong: meta.name,
-            cityName: meta.city,
-            regionGroup: meta.region,
-            lat: (item.geolocation && item.geolocation.location && item.geolocation.location.latitude) || meta.lat,
-            lon: (item.geolocation && item.geolocation.location && item.geolocation.location.longitude) || meta.lon,
-            pingMs: pingMs,
-            isp: (item.asn && item.asn.autonomous_system_organization) || "Open Proxy Relay",
-            displayName: meta.name + " (" + protoRaw.toUpperCase() + " " + item.host + ":" + item.port + ")"
-          });
-        }
-      }
-    }
-  } catch (_e) {
-    // Fallback continues cleanly
-  }
-
-  // Source B: Proxifly HTTPS-CONNECT capable proxies
-  try {
-    const rPx = await fetchWithTimeout(SHIHAB_PROXIFLY_HTTPS_URL, {}, 8000);
+    const rPx = await fetchWithTimeout(SHIHAB_PROXIFLY_HTTPS_URL, {}, 7500);
     if (rPx.ok) {
       const arr2 = await rPx.json();
       if (Array.isArray(arr2)) {
@@ -243,6 +194,9 @@ async function refreshShihabStandaloneCatalog(state) {
           const key = "http_connect://" + it.ip + ":" + it.port;
           if (proxyMap.has(key)) continue;
 
+          const score = Number(it.score || 60);
+          const estPing = Math.max(22, Math.min(140, 110 - Math.round(score * 0.6)));
+
           proxyMap.set(key, {
             id: "pub_hc_" + it.ip.replace(/[^a-zA-Z0-9]/g, "_") + "_" + it.port,
             sourceKind: "public_proxy",
@@ -256,7 +210,8 @@ async function refreshShihabStandaloneCatalog(state) {
             regionGroup: meta.region,
             lat: meta.lat,
             lon: meta.lon,
-            pingMs: 65,
+            pingMs: estPing,
+            sslVerified: true,
             isp: "HTTPS-Capable Open Proxy",
             displayName: meta.name + " (CONNECT " + it.ip + ":" + it.port + ")"
           });
@@ -267,9 +222,116 @@ async function refreshShihabStandaloneCatalog(state) {
     // Fallback continues cleanly
   }
 
-  // Source C: OpenVPN (.ovpn) / OpenGW global catalog for 1-click .ovpn profile export in browser
+  // Source B: Vakhov Fresh Proxy List (SSL-verified HTTPS & SOCKS5 with live latency)
   try {
-    const rOvpn = await fetchWithTimeout(SHIHAB_OVPN_POOL_URL, {}, 8500);
+    const rVk = await fetchWithTimeout(SHIHAB_VAKHOV_FRESH_URL, {}, 7500);
+    if (rVk.ok) {
+      const arrVk = await rVk.json();
+      if (Array.isArray(arrVk)) {
+        for (let i = 0; i < arrVk.length; i++) {
+          const v = arrVk[i];
+          if (!v || !v.ip || !v.port) continue;
+          const isHttps = String(v.ssl) === "1" || String(v.https) === "1";
+          const isSocks5 = String(v.socks5) === "1";
+          if (!isHttps && !isSocks5) continue;
+
+          let cc = String(v.country_code || "").toUpperCase();
+          if (cc === "UK") cc = "GB";
+          if (!cc || cc.length !== 2 || cc === "ZZ") continue;
+
+          const meta = resolveShihabCountryMeta(cc);
+          const protoLabel = isHttps ? "HTTP CONNECT" : "SOCKS5";
+          const pacDir = isHttps
+            ? ("PROXY " + v.ip + ":" + v.port)
+            : ("SOCKS5 " + v.ip + ":" + v.port + "; SOCKS " + v.ip + ":" + v.port);
+          const key = protoLabel + "://" + v.ip + ":" + v.port;
+          if (proxyMap.has(key)) continue;
+
+          const rawDelayMs = Number(v.delay || 0);
+          const estPing = rawDelayMs > 0 ? Math.max(18, Math.min(220, Math.round(rawDelayMs / 4))) : 55;
+
+          proxyMap.set(key, {
+            id: "pub_vk_" + v.ip.replace(/[^a-zA-Z0-9]/g, "_") + "_" + v.port,
+            sourceKind: "public_proxy",
+            protocol: protoLabel,
+            pacDirective: pacDir,
+            host: String(v.ip),
+            port: Number(v.port),
+            countryShort: cc,
+            countryLong: meta.name,
+            cityName: v.city ? String(v.city) : meta.city,
+            regionGroup: meta.region,
+            lat: meta.lat,
+            lon: meta.lon,
+            pingMs: estPing,
+            sslVerified: isHttps,
+            isp: v.isp ? String(v.isp) : "Verified Open Relay",
+            displayName: meta.name + " (" + protoLabel + " " + v.ip + ":" + v.port + ")"
+          });
+        }
+      }
+    }
+  } catch (_e) {
+    // Fallback continues cleanly
+  }
+
+  // Source C: Monosans verified geolocation proxies (SOCKS5 / HTTP)
+  try {
+    const rMono = await fetchWithTimeout(SHIHAB_MONOSANS_URL, {}, 7500);
+    if (rMono.ok) {
+      const arr = await rMono.json();
+      if (Array.isArray(arr)) {
+        for (let i = 0; i < arr.length; i++) {
+          const item = arr[i];
+          if (!item || !item.host || !item.port) continue;
+          const protoRaw = String(item.protocol || "http").toLowerCase();
+          if (protoRaw !== "socks5" && protoRaw !== "http") continue;
+
+          let cc = (item.geolocation && item.geolocation.country && item.geolocation.country.iso_code) || "GL";
+          cc = String(cc).toUpperCase();
+          if (cc === "UK") cc = "GB";
+          if (!cc || cc === "GL") continue;
+
+          const meta = resolveShihabCountryMeta(cc);
+          // Note: monosans `timeout` is full HTTP page-scrape time (3-4 RTTs), NOT 1-RTT ping!
+          const estSingleRtt = item.timeout
+            ? Math.max(18, Math.min(240, Math.round((Number(item.timeout) * 1000) / 3.5)))
+            : 68;
+          const key = protoRaw + "://" + item.host + ":" + item.port;
+          if (proxyMap.has(key)) continue;
+
+          const pacDir = protoRaw === "socks5"
+            ? ("SOCKS5 " + item.host + ":" + item.port + "; SOCKS " + item.host + ":" + item.port)
+            : ("PROXY " + item.host + ":" + item.port);
+
+          proxyMap.set(key, {
+            id: "pub_px_" + item.host.replace(/[^a-zA-Z0-9]/g, "_") + "_" + item.port,
+            sourceKind: "public_proxy",
+            protocol: protoRaw.toUpperCase(),
+            pacDirective: pacDir,
+            host: String(item.host),
+            port: Number(item.port),
+            countryShort: cc,
+            countryLong: meta.name,
+            cityName: meta.city,
+            regionGroup: meta.region,
+            lat: (item.geolocation && item.geolocation.location && item.geolocation.location.latitude) || meta.lat,
+            lon: (item.geolocation && item.geolocation.location && item.geolocation.location.longitude) || meta.lon,
+            pingMs: estSingleRtt,
+            sslVerified: false,
+            isp: (item.asn && item.asn.autonomous_system_organization) || "Open Proxy Relay",
+            displayName: meta.name + " (" + protoRaw.toUpperCase() + " " + item.host + ":" + item.port + ")"
+          });
+        }
+      }
+    }
+  } catch (_e) {
+    // Fallback continues cleanly
+  }
+
+  // Source D: OpenVPN (.ovpn) / OpenGW global catalog for 1-click .ovpn profile export in browser
+  try {
+    const rOvpn = await fetchWithTimeout(SHIHAB_OVPN_POOL_URL, {}, 8000);
     if (rOvpn.ok) {
       const pool = await rOvpn.json();
       const entries = pool && Array.isArray(pool.Servers) ? pool.Servers : (Array.isArray(pool) ? pool : []);
@@ -300,12 +362,12 @@ async function refreshShihabStandaloneCatalog(state) {
     // Optional .ovpn pool
   }
 
-  // Balance and sort public proxies: prioritize SOCKS5 & HTTP CONNECT with lowest ping, max 25 per country
+  // Balance and sort public proxies: prioritize SSL-verified HTTP CONNECT & fast SOCKS5, max 30 per country
   const allProxies = Array.from(proxyMap.values());
   allProxies.sort((a, b) => {
-    const pa = a.protocol === "SOCKS5" ? 0 : (a.protocol === "HTTP CONNECT" ? 1 : 2);
-    const pb = b.protocol === "SOCKS5" ? 0 : (b.protocol === "HTTP CONNECT" ? 1 : 2);
-    if (pa !== pb) return pa - pb;
+    const sa = a.sslVerified ? 0 : (a.protocol === "HTTP CONNECT" ? 1 : (a.protocol === "SOCKS5" ? 2 : 3));
+    const sb = b.sslVerified ? 0 : (b.protocol === "HTTP CONNECT" ? 1 : (b.protocol === "SOCKS5" ? 2 : 3));
+    if (sa !== sb) return sa - sb;
     return (a.pingMs || 99) - (b.pingMs || 99);
   });
 
@@ -314,7 +376,7 @@ async function refreshShihabStandaloneCatalog(state) {
   for (let i = 0; i < allProxies.length; i++) {
     const p = allProxies[i];
     const c = perCountryCount[p.countryShort] || 0;
-    if (c >= 25) continue;
+    if (c >= 30) continue;
     perCountryCount[p.countryShort] = c + 1;
     balanced.push(p);
   }
@@ -340,15 +402,21 @@ async function refreshShihabStandaloneCatalog(state) {
 }
 
 // =========================================================================
-// 3. CHROMIUM PAC GENERATOR, PROXY ENGINE & WEBRTC SHIELD
+// 3. FAIL-CLOSED CHROMIUM PAC GENERATOR, PROXY ENGINE & WEBRTC SHIELD
 // =========================================================================
-function buildShihabPacScript(pacDirective, bypassDomains) {
+function buildShihabPacScript(pacDirectivesOrChain, bypassDomains) {
   const cleanBypass = Array.isArray(bypassDomains)
     ? bypassDomains.map((d) => String(d || "").trim().toLowerCase()).filter(Boolean)
     : [];
 
+  const chainStr = Array.isArray(pacDirectivesOrChain)
+    ? pacDirectivesOrChain.filter(Boolean).join("; ")
+    : String(pacDirectivesOrChain || "");
+
+  // CRITICAL: NO trailing "; DIRECT" so dead public proxies fail closed or fail over to next same-country proxy,
+  // NEVER silently leaking the user's real ISP IP!
   const bypassJson = JSON.stringify(cleanBypass);
-  const proxyTokenJson = JSON.stringify(pacDirective + "; DIRECT");
+  const proxyTokenJson = JSON.stringify(chainStr);
 
   return (
     "function FindProxyForURL(url, host) {\n" +
@@ -357,6 +425,9 @@ function buildShihabPacScript(pacDirective, bypassDomains) {
     "    return 'DIRECT';\n" +
     "  }\n" +
     "  if (/^(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.|127\\.)/.test(h)) {\n" +
+    "    return 'DIRECT';\n" +
+    "  }\n" +
+    "  if (h === 'raw.githubusercontent.com' || h === 'cdn.jsdelivr.net') {\n" +
     "    return 'DIRECT';\n" +
     "  }\n" +
     "  var rules = " + bypassJson + ";\n" +
@@ -372,7 +443,7 @@ function buildShihabPacScript(pacDirective, bypassDomains) {
   );
 }
 
-async function applyShihabBrowserProxyNode(state, node) {
+async function applyShihabBrowserProxyNode(state, node, backupDirectives) {
   if (!node || !node.pacDirective) {
     throw new Error("Invalid proxy node configuration.");
   }
@@ -388,7 +459,16 @@ async function applyShihabBrowserProxyNode(state, node) {
     shihabAuthCredsInMemory = null;
   }
 
-  const pacData = buildShihabPacScript(node.pacDirective, state.bypassDomains);
+  const chain = [node.pacDirective];
+  if (Array.isArray(backupDirectives)) {
+    for (let i = 0; i < backupDirectives.length && chain.length < 3; i++) {
+      if (backupDirectives[i] && !chain.includes(backupDirectives[i])) {
+        chain.push(backupDirectives[i]);
+      }
+    }
+  }
+
+  const pacData = buildShihabPacScript(chain, state.bypassDomains);
   await chrome.proxy.settings.set({
     value: {
       mode: "pac_script",
@@ -456,8 +536,20 @@ if (chrome.webRequest && chrome.webRequest.onAuthRequired) {
 }
 
 // =========================================================================
-// 4. CANDIDATE SELECTION & DYNAMIC IP ROTATION
+// 4. CANDIDATE SELECTION, DEAD-NODE QUARANTINE & LOW-LATENCY ROTATION
 // =========================================================================
+function isShihabProxyQuarantined(host, port) {
+  const key = host + ":" + port;
+  const until = shihabDeadProxyUntilMs.get(key) || 0;
+  if (until > Date.now()) return true;
+  if (until > 0) shihabDeadProxyUntilMs.delete(key);
+  return false;
+}
+
+function quarantineDeadShihabProxy(host, port) {
+  shihabDeadProxyUntilMs.set(host + ":" + port, Date.now() + 10 * 60 * 1000);
+}
+
 function recordShihabRecentBrowserHost(state, countryCode, hostPortKey) {
   if (!hostPortKey) return;
   const cc = String(countryCode || "AUTO").toUpperCase();
@@ -468,68 +560,133 @@ function recordShihabRecentBrowserHost(state, countryCode, hostPortKey) {
   state.recentHostsByCountry[cc] = filtered.slice(-12);
 }
 
-function selectBestStandaloneProxyNode(state, cacheObj) {
+function buildOrderedStandaloneCandidates(state, cacheObj) {
   const privs = Array.isArray(state.privateProxies) ? state.privateProxies : [];
   const pubs = Array.isArray(cacheObj.publicProxies) ? cacheObj.publicProxies : [];
 
   if (state.selectedNodeId) {
     const foundPriv = privs.find((p) => p.id === state.selectedNodeId);
-    if (foundPriv) return foundPriv;
+    if (foundPriv) return [foundPriv];
     const foundPub = pubs.find((p) => p.id === state.selectedNodeId);
-    if (foundPub) return foundPub;
+    if (foundPub) return [foundPub];
   }
 
   let wantedCc = String(state.selectedCountryCode || "AUTO").toUpperCase();
   if (wantedCc === "UK") wantedCc = "GB";
 
-  let candidates = pubs.filter((p) => wantedCc === "AUTO" || p.countryShort === wantedCc);
+  let candidates = pubs.filter(
+    (p) => (wantedCc === "AUTO" || p.countryShort === wantedCc) && !isShihabProxyQuarantined(p.host, p.port)
+  );
   if (candidates.length === 0 && privs.length > 0) {
-    return privs[0];
+    return privs.slice();
   }
   if (candidates.length === 0) {
-    candidates = pubs.slice();
+    candidates = pubs.filter((p) => wantedCc === "AUTO" || p.countryShort === wantedCc);
   }
   if (candidates.length === 0) {
-    return null;
+    return [];
   }
+
+  candidates.sort((a, b) => (a.pingMs || 99) - (b.pingMs || 99));
 
   const recent = (state.recentHostsByCountry && state.recentHostsByCountry[wantedCc]) || [];
   if (!state.dynamicIpRotation && recent.length > 0) {
     const stickyKey = recent[recent.length - 1];
-    const sticky = candidates.find((c) => (c.host + ":" + c.port) === stickyKey);
-    if (sticky) return sticky;
+    const idx = candidates.findIndex((c) => (c.host + ":" + c.port) === stickyKey);
+    if (idx > 0) {
+      const [sticky] = candidates.splice(idx, 1);
+      candidates.unshift(sticky);
+    }
+    return candidates;
   }
 
   if (state.dynamicIpRotation && recent.length > 0) {
-    const fresh = candidates.filter((c) => !recent.includes(c.host + ":" + c.port));
-    if (fresh.length > 0) {
-      return fresh[0];
-    }
+    const bestPing = candidates[0].pingMs || 45;
+    const fastLimit = Math.max(bestPing + 30, Math.round(bestPing * 1.35));
+    const fastFresh = candidates.filter((c) => (c.pingMs || 99) <= fastLimit && !recent.includes(c.host + ":" + c.port));
+    const fastVisited = candidates.filter((c) => (c.pingMs || 99) <= fastLimit && recent.includes(c.host + ":" + c.port));
+    const rest = candidates.filter((c) => (c.pingMs || 99) > fastLimit);
+    return fastFresh.concat(fastVisited, rest);
   }
 
-  return candidates[0];
+  return candidates;
 }
 
 // =========================================================================
-// 5. LIVE GEOIP AUDIT & SPEED PROBE
+// 5. LIVE GEOIP AUDIT & WARM 1-RTT SPEED PROBE
 // =========================================================================
+function parseCloudflareTraceText(txt) {
+  const out = {};
+  const lines = String(txt || "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const eq = lines[i].indexOf("=");
+    if (eq > 0) {
+      out[lines[i].slice(0, eq).trim()] = lines[i].slice(eq + 1).trim();
+    }
+  }
+  return out;
+}
+
+async function probeWarmProxyExitAndSingleRttMs(originIp, timeoutMs) {
+  // Request #0: Establish TCP + HTTP CONNECT + TLS 1.3 session & verify non-leaking egress IP
+  const r0 = await fetchWithTimeout("https://1.1.1.1/cdn-cgi/trace", {}, timeoutMs || 2400);
+  if (!r0.ok) {
+    return null;
+  }
+  const trace = parseCloudflareTraceText(await r0.text());
+  const exitIp = String(trace.ip || "").trim();
+  if (!exitIp || (originIp && exitIp === originIp)) {
+    return null;
+  }
+
+  // Requests #1 & #2: Measure pure 1-RTT HTTP round-trip on the already-warm keep-alive TLS session!
+  const warmSamples = [];
+  for (let i = 0; i < 2; i++) {
+    const t0 = performance.now();
+    try {
+      const rWarm = await fetchWithTimeout("https://1.1.1.1/cdn-cgi/trace", {}, 1800);
+      if (rWarm.ok) {
+        await rWarm.text();
+        warmSamples.push(Math.max(1, Math.round(performance.now() - t0)));
+      }
+    } catch (_e) {}
+  }
+
+  const warmPingMs = warmSamples.length > 0 ? Math.min(...warmSamples) : 48;
+  let cc = String(trace.loc || "GL").toUpperCase();
+  if (cc === "UK") cc = "GB";
+  return { exitIp, countryShort: cc, warmPingMs };
+}
+
 async function verifyShihabBrowserGeoIp(state, captureOriginIfDisconnected) {
   let ipv4 = "";
+  let traceCc = "";
   try {
-    const rIp = await fetchWithTimeout("https://api.ipify.org", {}, 4500);
-    if (rIp.ok) {
-      ipv4 = (await rIp.text()).trim();
+    const rTr = await fetchWithTimeout("https://1.1.1.1/cdn-cgi/trace", {}, 3200);
+    if (rTr.ok) {
+      const tr = parseCloudflareTraceText(await rTr.text());
+      if (tr.ip) ipv4 = tr.ip;
+      if (tr.loc) traceCc = String(tr.loc).toUpperCase();
     }
   } catch (_e) {}
+
+  if (!ipv4) {
+    try {
+      const rIp = await fetchWithTimeout("https://api.ipify.org", {}, 3500);
+      if (rIp.ok) {
+        ipv4 = (await rIp.text()).trim();
+      }
+    } catch (_e) {}
+  }
 
   let geo = null;
   try {
     const whoUrl = ipv4 ? ("https://ipwho.is/" + encodeURIComponent(ipv4)) : "https://ipwho.is/";
-    const rWho = await fetchWithTimeout(whoUrl, {}, 4800);
+    const rWho = await fetchWithTimeout(whoUrl, {}, 4200);
     if (rWho.ok) {
       const d = await rWho.json();
       if (d && d.success !== false && d.ip) {
-        let cc = String(d.country_code || "GL").toUpperCase();
+        let cc = String(d.country_code || traceCc || "GL").toUpperCase();
         if (cc === "UK") cc = "GB";
         const meta = resolveShihabCountryMeta(cc);
         const conn = d.connection || {};
@@ -550,16 +707,18 @@ async function verifyShihabBrowserGeoIp(state, captureOriginIfDisconnected) {
   } catch (_e) {}
 
   if (!geo && ipv4) {
+    const cc = traceCc && traceCc.length === 2 ? (traceCc === "UK" ? "GB" : traceCc) : "GL";
+    const meta = resolveShihabCountryMeta(cc === "GL" ? "US" : cc);
     geo = {
       ipAddress: ipv4,
-      countryShort: "GL",
-      countryLong: "Verified Egress",
-      city: "Internet Gateway",
-      isp: "Active Route",
+      countryShort: cc,
+      countryLong: cc === "GL" ? "Verified Egress" : meta.name,
+      city: cc === "GL" ? "Internet Gateway" : meta.city,
+      isp: "Active Encrypted Route",
       asn: "",
-      lat: 38.9,
-      lon: -77.0,
-      localClock: formatShihabCountryClock("US"),
+      lat: meta.lat,
+      lon: meta.lon,
+      localClock: formatShihabCountryClock(cc === "GL" ? "US" : cc),
       leakDetected: false
     };
   }
@@ -583,23 +742,29 @@ async function verifyShihabBrowserGeoIp(state, captureOriginIfDisconnected) {
 }
 
 async function runShihabBrowserSpeedProbe(state) {
+  // Warm connection first so TCP + TLS setup is excluded from 1-RTT ping measurement!
+  try {
+    const warm = await fetchWithTimeout("https://1.1.1.1/cdn-cgi/trace", {}, 2500);
+    if (warm.ok) await warm.text();
+  } catch (_e) {}
+
   const samples = [];
   for (let i = 0; i < 3; i++) {
     const t0 = performance.now();
     try {
-      await fetchWithTimeout("https://1.1.1.1/cdn-cgi/trace", {}, 3500);
-      samples.push(Math.max(1, Math.round(performance.now() - t0)));
+      const r = await fetchWithTimeout("https://1.1.1.1/cdn-cgi/trace", {}, 2500);
+      if (r.ok) {
+        await r.text();
+        samples.push(Math.max(1, Math.round(performance.now() - t0)));
+      }
     } catch (_e) {}
   }
 
-  const avgPing = samples.length > 0
-    ? Math.round(samples.reduce((a, b) => a + b, 0) / samples.length)
-    : 28;
-  const jitter = samples.length >= 2
-    ? Math.max(1, Math.abs(samples[samples.length - 1] - samples[0]))
-    : 2;
+  const bestPing = samples.length > 0 ? Math.min(...samples) : (state.lastPingMs || 32);
+  const maxPing = samples.length > 0 ? Math.max(...samples) : bestPing + 2;
+  const jitter = samples.length >= 2 ? Math.max(1, maxPing - bestPing) : 2;
 
-  let mbps = state.peakSpeedMbps || 12.5;
+  let mbps = state.peakSpeedMbps || 0.0;
   try {
     const tStart = performance.now();
     const rDl = await fetchWithTimeout("https://speed.cloudflare.com/__down?bytes=2000000", {}, 7500);
@@ -610,20 +775,81 @@ async function runShihabBrowserSpeedProbe(state) {
     }
   } catch (_e) {}
 
-  state.lastPingMs = avgPing;
+  state.lastPingMs = bestPing;
   state.lastJitterMs = jitter;
+  if (state.activeNode) {
+    state.activeNode.pingMs = bestPing;
+  }
   if (mbps > (state.peakSpeedMbps || 0)) {
     state.peakSpeedMbps = mbps;
   }
-  appendShihabLog(state, "VERIFY", "Speed benchmark: " + mbps + " Mbps • Ping " + avgPing + " ms • Jitter " + jitter + " ms");
+  appendShihabLog(state, "VERIFY", "Speed benchmark: " + mbps + " Mbps • Warm 1-RTT " + bestPing + " ms • Jitter " + jitter + " ms");
   await saveShihabState(state);
 
-  return { downloadMbps: mbps, pingMs: avgPing, jitterMs: jitter };
+  return { downloadMbps: mbps, pingMs: bestPing, jitterMs: jitter };
 }
 
 // =========================================================================
 // 6. CONNECT / DISCONNECT / ROTATE IP ORCHESTRATOR
 // =========================================================================
+async function connectVerifiedStandaloneBrowserProxy(state, cacheObj) {
+  // Capture real origin IP before applying proxy if not yet known
+  if (!state.originGeo || !state.originGeo.ipAddress) {
+    await clearShihabBrowserProxySettings();
+    try {
+      await verifyShihabBrowserGeoIp(state, true);
+    } catch (_e) {}
+  }
+  const originIp = (state.originGeo && state.originGeo.ipAddress) || "";
+
+  const candidates = buildOrderedStandaloneCandidates(state, cacheObj);
+  if (candidates.length === 0) {
+    throw new Error("No proxy relay available. Launch MASTER VPN PRO Desktop or click Refresh Relays.");
+  }
+
+  const maxAttempts = Math.min(candidates.length, 5);
+  for (let i = 0; i < maxAttempts; i++) {
+    const cand = candidates[i];
+    const backups = [];
+    for (let j = i + 1; j < candidates.length && backups.length < 2; j++) {
+      if (candidates[j].countryShort === cand.countryShort) {
+        backups.push(candidates[j].pacDirective);
+      }
+    }
+
+    await applyShihabBrowserProxyNode(state, cand, backups);
+    await new Promise((r) => setTimeout(r, 75));
+
+    // User-configured Private Proxies with custom auth may prompt 407 interactively on tab navigation
+    if (cand.sourceKind === "private_proxy") {
+      return { chosen: cand, warmPingMs: cand.pingMs || 25, verifiedTrace: null };
+    }
+
+    try {
+      const verified = await probeWarmProxyExitAndSingleRttMs(originIp, 2300);
+      if (verified && verified.exitIp) {
+        cand.pingMs = verified.warmPingMs;
+        return { chosen: cand, warmPingMs: verified.warmPingMs, verifiedTrace: verified };
+      }
+    } catch (_e) {}
+
+    quarantineDeadShihabProxy(cand.host, cand.port);
+  }
+
+  // Fail closed: restore clean direct state instead of staying fake-"Protected" on a dead proxy!
+  await clearShihabBrowserProxySettings();
+  state.connected = false;
+  state.activeMode = "none";
+  await saveShihabState(state);
+
+  const wantedCc = String(state.selectedCountryCode || "AUTO").toUpperCase();
+  const countryLabel = wantedCc === "AUTO" ? "selected region" : resolveShihabCountryMeta(wantedCc).name;
+  throw new Error(
+    "Free public browser proxies for " + countryLabel +
+    " timed out. Launch MASTER VPN PRO Desktop (MasterVpnPro.exe) for instant 70+ country encrypted MS-SSTP gateways, or pick another country / add a Private Proxy."
+  );
+}
+
 async function handleShihabConnect(state, targetSpec) {
   if (targetSpec && typeof targetSpec === "object") {
     if (targetSpec.countryCode) {
@@ -652,24 +878,19 @@ async function handleShihabConnect(state, targetSpec) {
     state.activeMode = "desktop";
     state.connected = true;
     state.connectedSinceMs = Date.now();
-    appendShihabLog(state, "TUNNEL", "Triggered MASTER VPN PRO Desktop MS-SSTP Tunnel (" + (state.selectedCountryCode || "AUTO") + ").");
+    appendShihabLog(state, "TUNNEL", "Triggered MASTER VPN PRO Desktop Low-Latency MS-SSTP Engine (" + (state.selectedCountryCode || "AUTO") + ").");
     await updateToolbarBadge(true, state.selectedCountryCode === "AUTO" ? "VPN" : state.selectedCountryCode);
     await saveShihabState(state);
     return;
   }
 
-  // Standalone Browser Proxy Mode
+  // Standalone Browser Proxy Mode (Live-Verified + Warm 1-RTT Measured)
   let cacheObj = await loadShihabRelayCache();
   if ((!cacheObj.publicProxies || cacheObj.publicProxies.length === 0) && state.privateProxies.length === 0) {
     cacheObj = await refreshShihabStandaloneCatalog(state);
   }
 
-  const chosen = selectBestStandaloneProxyNode(state, cacheObj);
-  if (!chosen) {
-    throw new Error("No proxy relay available. Click Refresh Relays or add a Private Proxy.");
-  }
-
-  await applyShihabBrowserProxyNode(state, chosen);
+  const { chosen, warmPingMs, verifiedTrace } = await connectVerifiedStandaloneBrowserProxy(state, cacheObj);
   recordShihabRecentBrowserHost(state, chosen.countryShort, chosen.host + ":" + chosen.port);
   recordShihabRecentBrowserHost(state, "AUTO", chosen.host + ":" + chosen.port);
 
@@ -677,14 +898,32 @@ async function handleShihabConnect(state, targetSpec) {
   state.connected = true;
   state.connectedSinceMs = Date.now();
   state.activeNode = chosen;
+  state.lastPingMs = warmPingMs;
+
+  if (verifiedTrace && verifiedTrace.exitIp) {
+    const meta = resolveShihabCountryMeta(verifiedTrace.countryShort || chosen.countryShort);
+    state.currentGeo = {
+      ipAddress: verifiedTrace.exitIp,
+      countryShort: verifiedTrace.countryShort || chosen.countryShort,
+      countryLong: meta.name,
+      city: meta.city,
+      isp: chosen.isp || "Verified Proxy Egress",
+      asn: "",
+      lat: meta.lat,
+      lon: meta.lon,
+      localClock: formatShihabCountryClock(verifiedTrace.countryShort || chosen.countryShort),
+      leakDetected: false
+    };
+  }
+
   appendShihabLog(
     state,
     "PROXY",
-    "Browser PAC active -> " + chosen.countryLong + " (" + chosen.protocol + " " + chosen.host + ":" + chosen.port + ")"
+    "Verified Browser PAC -> " + chosen.countryLong + " (" + chosen.protocol + " " + chosen.host + ":" + chosen.port + " • " + warmPingMs + " ms RTT)"
   );
   await saveShihabState(state);
 
-  // Verify GeoIP asynchronously
+  // Enrich full ISP/ASN GeoIP asynchronously
   verifyShihabBrowserGeoIp(state, false).catch(() => {});
 }
 
@@ -720,20 +959,21 @@ async function handleShihabRotateIp(state) {
   }
 
   const cacheObj = await loadShihabRelayCache();
-  const nextNode = selectBestStandaloneProxyNode(state, cacheObj);
-  state.dynamicIpRotation = prevDyn;
-
-  if (!nextNode) {
-    throw new Error("No alternate proxy gateway available for rotation.");
-  }
-
-  state.activeNode = nextNode;
   if (state.connected) {
-    await applyShihabBrowserProxyNode(state, nextNode);
-    appendShihabLog(state, "PROXY", "Rotated browser IP -> " + nextNode.countryLong + " (" + nextNode.host + ":" + nextNode.port + ")");
+    const { chosen, warmPingMs } = await connectVerifiedStandaloneBrowserProxy(state, cacheObj);
+    state.dynamicIpRotation = prevDyn;
+    state.activeNode = chosen;
+    state.lastPingMs = warmPingMs;
+    appendShihabLog(state, "PROXY", "Rotated browser IP -> " + chosen.countryLong + " (" + chosen.host + ":" + chosen.port + " • " + warmPingMs + " ms)");
     verifyShihabBrowserGeoIp(state, false).catch(() => {});
   } else {
-    appendShihabLog(state, "PROXY", "Selected next gateway -> " + nextNode.countryLong + " (" + nextNode.host + ":" + nextNode.port + ")");
+    const cands = buildOrderedStandaloneCandidates(state, cacheObj);
+    state.dynamicIpRotation = prevDyn;
+    if (!cands.length) {
+      throw new Error("No alternate proxy gateway available for rotation.");
+    }
+    state.activeNode = cands[0];
+    appendShihabLog(state, "PROXY", "Selected next gateway -> " + cands[0].countryLong + " (" + cands[0].host + ":" + cands[0].port + ")");
   }
   await saveShihabState(state);
 }
@@ -769,6 +1009,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         queryShihabDesktopBridgeCatalog(),
         loadShihabRelayCache()
       ]);
+
+      // If MASTER VPN PRO Desktop is actively protecting the system while extension had an old PAC rule in Auto mode, hand off cleanly!
+      if (state.enginePreference === "auto" && desktopStatus && desktopStatus.connected && state.activeMode === "browser_proxy") {
+        await clearShihabBrowserProxySettings();
+        state.activeMode = "desktop";
+        state.connected = true;
+        await saveShihabState(state);
+      }
 
       if (desktopStatus && desktopStatus.connected) {
         await updateToolbarBadge(true, desktopStatus.countryShort || "VPN");

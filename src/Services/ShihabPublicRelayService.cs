@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -30,7 +31,9 @@ namespace ShihabShieldVpn.Services
 
         private static readonly string[] ShihabPriorityCountryOrder = new string[]
         {
-            "US", "GB", "CA", "DE", "FR", "SG", "IN", "AU", "NL", "CH", "JP", "KR", "AE", "BR", "BD", "IT", "ES", "SE", "FI", "RO", "HK", "TW"
+            "SG", "IN", "HK", "TH", "MY", "VN", "JP", "KR", "TW", "BD", "AE",
+            "DE", "NL", "GB", "FR", "CH", "SE", "FI", "RO", "IT", "ES", "PL",
+            "US", "CA", "AU", "BR"
         };
 
         private readonly string _cacheFilePath;
@@ -42,7 +45,7 @@ namespace ShihabShieldVpn.Services
             string dir = string.IsNullOrWhiteSpace(dataDirectory)
                 ? ShihabConfigService.ResolveShihabWritableDataDir()
                 : dataDirectory;
-            _cacheFilePath = Path.Combine(dir, "ShihabPublicRelays.v2.cache.json");
+            _cacheFilePath = Path.Combine(dir, "ShihabPublicRelays.v3.cache.json");
             _cachedPublicRelays = LoadCachedRelaysFromDisk();
         }
 
@@ -146,7 +149,7 @@ namespace ShihabShieldVpn.Services
                 {
                     if (probeTopLatency)
                     {
-                        ProbeShihabTcp443Batch(merged, 14, 1300);
+                        ProbeShihabMultiCountryFastestBatch(merged, 4, 96, 800);
                         SortShihabRelays(merged);
                     }
 
@@ -343,24 +346,57 @@ namespace ShihabShieldVpn.Services
                     {
                         sum.OpenVpnProfileCount++;
                     }
-                    if (n.PingMs > 0 && n.PingMs < sum.BestPingMs)
+                    if (CompareShihabNodes(n, sum.BestNode) < 0)
                     {
-                        sum.BestPingMs = n.PingMs;
+                        sum.BestNode = n;
                     }
                     if (n.SpeedMbps > sum.BestSpeedMbps)
                     {
                         sum.BestSpeedMbps = n.SpeedMbps;
                     }
-                    if (CompareShihabNodes(n, sum.BestNode) < 0)
+                }
+            }
+
+            foreach (ShihabCountryHubSummary hub in map.Values)
+            {
+                int localBest = 9999;
+                int anyBest = 9999;
+                if (relays != null)
+                {
+                    for (int i = 0; i < relays.Count; i++)
                     {
-                        sum.BestNode = n;
+                        ShihabVpnServerNode r = relays[i];
+                        if (r == null || !string.Equals(r.CountryShort, hub.CountryShort, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (r.PingMs > 0)
+                        {
+                            if (r.IsLocallyProbed && (r.IsTcp443Reachable || r.IsSstpVerified) && r.PingMs < localBest)
+                            {
+                                localBest = r.PingMs;
+                            }
+                            if ((r.IsTcp443Reachable || !r.IsLocallyProbed) && r.PingMs < anyBest)
+                            {
+                                anyBest = r.PingMs;
+                            }
+                        }
                     }
                 }
+                hub.BestPingMs = localBest < 9999 ? localBest : (anyBest < 9999 ? anyBest : 85);
             }
 
             List<ShihabCountryHubSummary> result = new List<ShihabCountryHubSummary>(map.Values);
             result.Sort(delegate(ShihabCountryHubSummary a, ShihabCountryHubSummary b)
             {
+                bool aLocal = a.BestNode != null && a.BestNode.IsLocallyProbed && (a.BestNode.IsTcp443Reachable || a.BestNode.IsSstpVerified);
+                bool bLocal = b.BestNode != null && b.BestNode.IsLocallyProbed && (b.BestNode.IsTcp443Reachable || b.BestNode.IsSstpVerified);
+                if (aLocal != bLocal)
+                {
+                    return bLocal.CompareTo(aLocal);
+                }
+                if (aLocal && bLocal && a.BestPingMs != b.BestPingMs)
+                {
+                    return a.BestPingMs.CompareTo(b.BestPingMs);
+                }
+
                 int aPri = GetCountryPriorityIndex(a.CountryShort);
                 int bPri = GetCountryPriorityIndex(b.CountryShort);
                 if (aPri != bPri)
@@ -480,12 +516,26 @@ namespace ShihabShieldVpn.Services
                 return copy;
             }
 
-            // Dynamic IP Rotation mode:
-            // 1. Fresh reachable/verified gateways not in recent history
-            // 2. Previously visited reachable/verified gateways ordered oldest-visited first (round-robin)
-            // 3. Remaining unprobed gateways (fresh first, then visited)
-            List<ShihabVpnServerNode> freshVerified = new List<ShihabVpnServerNode>();
-            List<ShihabVpnServerNode> visitedVerified = new List<ShihabVpnServerNode>();
+            // Dynamic IP Rotation mode (Latency-Constrained):
+            // Only auto-rotate among top low-latency gateways (within max(+28ms, 1.30x) of fastest reachable node)
+            // so reconnecting NEVER jumps from a 55ms/115ms fiber gateway to a 440ms slow residential node.
+            int bestReachPing = 9999;
+            for (int i = 0; i < copy.Count; i++)
+            {
+                ShihabVpnServerNode cand = copy[i];
+                if ((cand.IsSstpVerified || cand.IsTcp443Reachable) && cand.PingMs > 0 && cand.PingMs < bestReachPing)
+                {
+                    bestReachPing = cand.PingMs;
+                }
+            }
+            int fastBandLimitMs = bestReachPing < 9999
+                ? Math.Max(bestReachPing + 28, (int)Math.Round(bestReachPing * 1.30))
+                : 9999;
+
+            List<ShihabVpnServerNode> fastFreshVerified = new List<ShihabVpnServerNode>();
+            List<ShihabVpnServerNode> fastVisitedVerified = new List<ShihabVpnServerNode>();
+            List<ShihabVpnServerNode> slowFreshVerified = new List<ShihabVpnServerNode>();
+            List<ShihabVpnServerNode> slowVisitedVerified = new List<ShihabVpnServerNode>();
             List<ShihabVpnServerNode> freshOther = new List<ShihabVpnServerNode>();
             List<ShihabVpnServerNode> visitedOther = new List<ShihabVpnServerNode>();
 
@@ -496,8 +546,18 @@ namespace ShihabShieldVpn.Services
                 bool isReach = n.IsSstpVerified || n.IsTcp443Reachable;
                 if (isReach)
                 {
-                    if (recIdx < 0) freshVerified.Add(n);
-                    else visitedVerified.Add(n);
+                    int np = n.PingMs > 0 ? n.PingMs : 450;
+                    bool inFastBand = np <= fastBandLimitMs;
+                    if (inFastBand)
+                    {
+                        if (recIdx < 0) fastFreshVerified.Add(n);
+                        else fastVisitedVerified.Add(n);
+                    }
+                    else
+                    {
+                        if (recIdx < 0) slowFreshVerified.Add(n);
+                        else slowVisitedVerified.Add(n);
+                    }
                 }
                 else
                 {
@@ -506,16 +566,20 @@ namespace ShihabShieldVpn.Services
                 }
             }
 
-            visitedVerified.Sort(delegate(ShihabVpnServerNode a, ShihabVpnServerNode b)
+            Comparison<ShihabVpnServerNode> oldestVisitedFirst = delegate(ShihabVpnServerNode a, ShihabVpnServerNode b)
             {
                 int ia = FindHostIndexIgnoreCase(recent, a.BareSstpHost);
                 int ib = FindHostIndexIgnoreCase(recent, b.BareSstpHost);
                 return ia.CompareTo(ib);
-            });
+            };
+            fastVisitedVerified.Sort(oldestVisitedFirst);
+            slowVisitedVerified.Sort(oldestVisitedFirst);
 
             List<ShihabVpnServerNode> ordered = new List<ShihabVpnServerNode>(copy.Count);
-            ordered.AddRange(freshVerified);
-            ordered.AddRange(visitedVerified);
+            ordered.AddRange(fastFreshVerified);
+            ordered.AddRange(fastVisitedVerified);
+            ordered.AddRange(slowFreshVerified);
+            ordered.AddRange(slowVisitedVerified);
             ordered.AddRange(freshOther);
             ordered.AddRange(visitedOther);
             return ordered;
@@ -534,6 +598,75 @@ namespace ShihabShieldVpn.Services
             return -1;
         }
 
+        public static void ProbeShihabMultiCountryFastestBatch(
+            List<ShihabVpnServerNode> nodes,
+            int perCountryCap,
+            int maxTotalProbes,
+            int timeoutMs)
+        {
+            if (nodes == null || nodes.Count == 0)
+            {
+                return;
+            }
+
+            Dictionary<string, List<ShihabVpnServerNode>> byCountry = new Dictionary<string, List<ShihabVpnServerNode>>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                ShihabVpnServerNode n = nodes[i];
+                if (n == null || string.IsNullOrWhiteSpace(n.CountryShort)) continue;
+                List<ShihabVpnServerNode> list;
+                if (!byCountry.TryGetValue(n.CountryShort, out list))
+                {
+                    list = new List<ShihabVpnServerNode>();
+                    byCountry[n.CountryShort] = list;
+                }
+                list.Add(n);
+            }
+
+            // Within each country, sort unprobed candidates by highest bandwidth + standard port 443 first
+            foreach (List<ShihabVpnServerNode> bucket in byCountry.Values)
+            {
+                bucket.Sort(delegate(ShihabVpnServerNode a, ShihabVpnServerNode b)
+                {
+                    int aStd = (a.Port == 443 || a.Port == 0) ? 1 : 0;
+                    int bStd = (b.Port == 443 || b.Port == 0) ? 1 : 0;
+                    if (aStd != bStd) return bStd.CompareTo(aStd);
+                    return b.SpeedBps.CompareTo(a.SpeedBps);
+                });
+            }
+
+            List<ShihabVpnServerNode> selected = new List<ShihabVpnServerNode>();
+            HashSet<string> seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Round-robin pick up to perCountryCap across priority countries first, then remaining countries
+            for (int pass = 0; pass < Math.Max(1, perCountryCap) && selected.Count < maxTotalProbes; pass++)
+            {
+                for (int p = 0; p < ShihabPriorityCountryOrder.Length && selected.Count < maxTotalProbes; p++)
+                {
+                    List<ShihabVpnServerNode> bucket;
+                    if (byCountry.TryGetValue(ShihabPriorityCountryOrder[p], out bucket) && pass < bucket.Count)
+                    {
+                        ShihabVpnServerNode cand = bucket[pass];
+                        if (seenIds.Add(cand.Id))
+                        {
+                            selected.Add(cand);
+                        }
+                    }
+                }
+
+                foreach (KeyValuePair<string, List<ShihabVpnServerNode>> kv in byCountry)
+                {
+                    if (selected.Count >= maxTotalProbes) break;
+                    if (pass < kv.Value.Count && seenIds.Add(kv.Value[pass].Id))
+                    {
+                        selected.Add(kv.Value[pass]);
+                    }
+                }
+            }
+
+            ProbeShihabTcp443Batch(selected, selected.Count, timeoutMs);
+        }
+
         public static void ProbeShihabTcp443Batch(List<ShihabVpnServerNode> nodes, int maxCount, int timeoutMs)
         {
             if (nodes == null || nodes.Count == 0)
@@ -542,7 +675,7 @@ namespace ShihabShieldVpn.Services
             }
 
             int count = Math.Min(nodes.Count, Math.Max(1, maxCount));
-            using (SemaphoreSlim gate = new SemaphoreSlim(6))
+            using (SemaphoreSlim gate = new SemaphoreSlim(28))
             {
                 List<Task> tasks = new List<Task>(count);
                 for (int i = 0; i < count; i++)
@@ -554,10 +687,9 @@ namespace ShihabShieldVpn.Services
                         try
                         {
                             int measuredMs;
-                            string host = item.BareSstpHost;
-                            int port = item.Port > 0 ? item.Port : 443;
-                            bool open = ProbeSingleTcpPort(host, port, timeoutMs, out measuredMs);
+                            bool open = MeasureTrueSingleRttMs(item, timeoutMs, out measuredMs);
                             item.WasProbed = true;
+                            item.IsLocallyProbed = true;
                             item.IsTcp443Reachable = open;
                             if (open && measuredMs > 0)
                             {
@@ -571,7 +703,134 @@ namespace ShihabShieldVpn.Services
                     }));
                 }
 
-                Task.WaitAll(tasks.ToArray(), timeoutMs * 3 + 1500);
+                Task.WaitAll(tasks.ToArray(), Math.Max(3500, timeoutMs * 5));
+            }
+        }
+
+        public static bool TryResolveEndpointIpOutsideTimer(string primaryIpOrHost, string fallbackHost, out IPAddress resolvedIp)
+        {
+            resolvedIp = null;
+            if (!string.IsNullOrWhiteSpace(primaryIpOrHost))
+            {
+                string trimmed = primaryIpOrHost.Trim();
+                if (IPAddress.TryParse(trimmed, out resolvedIp))
+                {
+                    return true;
+                }
+            }
+
+            string dnsTarget = !string.IsNullOrWhiteSpace(fallbackHost)
+                ? fallbackHost.Trim()
+                : (primaryIpOrHost ?? string.Empty).Trim();
+
+            if (string.IsNullOrEmpty(dnsTarget))
+            {
+                return false;
+            }
+
+            if (IPAddress.TryParse(dnsTarget, out resolvedIp))
+            {
+                return true;
+            }
+
+            try
+            {
+                IPAddress[] addrs = Dns.GetHostAddresses(dnsTarget);
+                if (addrs != null && addrs.Length > 0)
+                {
+                    for (int i = 0; i < addrs.Length; i++)
+                    {
+                        if (addrs[i].AddressFamily == AddressFamily.InterNetwork)
+                        {
+                            resolvedIp = addrs[i];
+                            return true;
+                        }
+                    }
+                    resolvedIp = addrs[0];
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        public static int MeasureIcmpEchoRttMs(IPAddress ipAddr, int timeoutMs)
+        {
+            if (ipAddr == null) return -1;
+            try
+            {
+                using (Ping pinger = new Ping())
+                {
+                    PingReply reply = pinger.Send(ipAddr, Math.Max(250, Math.Min(timeoutMs, 750)));
+                    if (reply != null && reply.Status == IPStatus.Success)
+                    {
+                        return Math.Max(1, (int)reply.RoundtripTime);
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return -1;
+        }
+
+        public static bool MeasureTrueSingleRttMs(ShihabVpnServerNode node, int timeoutMs, out int singleRttMs)
+        {
+            singleRttMs = 0;
+            if (node == null)
+            {
+                return false;
+            }
+
+            int port = node.Port > 0 ? node.Port : 443;
+            IPAddress ipAddr;
+            if (!TryResolveEndpointIpOutsideTimer(node.IpAddress, node.BareSstpHost, out ipAddr))
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(node.IpAddress) ||
+                node.IpAddress.IndexOf(".opengw.net", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                node.IpAddress = ipAddr.ToString();
+            }
+
+            return ProbeDirectIpTcpPort(ipAddr, port, timeoutMs, out singleRttMs);
+        }
+
+        public static bool ProbeDirectIpTcpPort(IPAddress ipAddr, int port, int timeoutMs, out int latencyMs)
+        {
+            latencyMs = 0;
+            if (ipAddr == null || port <= 0 || port > 65535)
+            {
+                return false;
+            }
+
+            TcpClient tcp = new TcpClient(ipAddr.AddressFamily);
+            try
+            {
+                Stopwatch sw = Stopwatch.StartNew();
+                IAsyncResult ar = tcp.BeginConnect(ipAddr, port, null, null);
+                bool signaled = ar.AsyncWaitHandle.WaitOne(timeoutMs, false);
+                if (signaled && tcp.Connected)
+                {
+                    tcp.EndConnect(ar);
+                    sw.Stop();
+                    latencyMs = Math.Max(1, (int)sw.ElapsedMilliseconds);
+                    return true;
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                try { tcp.Close(); } catch { }
             }
         }
 
@@ -580,6 +839,22 @@ namespace ShihabShieldVpn.Services
             latencyMs = 0;
             if (string.IsNullOrWhiteSpace(hostOrIp))
             {
+                return false;
+            }
+
+            // Resolve DNS BEFORE starting RTT Stopwatch so recursive DNS lookup never inflates network ping!
+            IPAddress resolvedIp;
+            if (TryResolveEndpointIpOutsideTimer(hostOrIp, null, out resolvedIp))
+            {
+                if (ProbeDirectIpTcpPort(resolvedIp, port, timeoutMs, out latencyMs))
+                {
+                    int icmpMs = MeasureIcmpEchoRttMs(resolvedIp, Math.Min(timeoutMs, 600));
+                    if (icmpMs > 0 && icmpMs < latencyMs)
+                    {
+                        latencyMs = icmpMs;
+                    }
+                    return true;
+                }
                 return false;
             }
 
@@ -696,14 +971,31 @@ namespace ShihabShieldVpn.Services
             list.Sort(CompareShihabNodes);
         }
 
+        private static int GetShihabNodeReachTier(ShihabVpnServerNode n)
+        {
+            if (n == null) return -1;
+            if (n.IsLocallyProbed)
+            {
+                if (n.IsSstpVerified) return 4;
+                if (n.IsTcp443Reachable) return 3;
+                return 0;
+            }
+            if (n.IsSstpVerified) return 3;
+            if (n.WasProbed)
+            {
+                return n.IsTcp443Reachable ? 2 : 0;
+            }
+            return 1;
+        }
+
         private static int CompareShihabNodes(ShihabVpnServerNode a, ShihabVpnServerNode b)
         {
             if (a == null && b == null) return 0;
             if (a == null) return 1;
             if (b == null) return -1;
 
-            int aReach = a.IsSstpVerified ? 3 : (a.WasProbed ? (a.IsTcp443Reachable ? 2 : 0) : 1);
-            int bReach = b.IsSstpVerified ? 3 : (b.WasProbed ? (b.IsTcp443Reachable ? 2 : 0) : 1);
+            int aReach = GetShihabNodeReachTier(a);
+            int bReach = GetShihabNodeReachTier(b);
             if (aReach != bReach)
             {
                 return bReach.CompareTo(aReach);
@@ -711,10 +1003,17 @@ namespace ShihabShieldVpn.Services
 
             int aPing = (a.PingMs > 0 && a.PingMs < 2000) ? a.PingMs : 450;
             int bPing = (b.PingMs > 0 && b.PingMs < 2000) ? b.PingMs : 450;
-            double aCappedSpeed = Math.Min(a.SpeedMbps, 200.0);
-            double bCappedSpeed = Math.Min(b.SpeedMbps, 200.0);
-            double aRank = (aCappedSpeed * 0.75) - (aPing * 1.25) - (a.LoadPercent * 0.35);
-            double bRank = (bCappedSpeed * 0.75) - (bPing * 1.25) - (b.LoadPercent * 0.35);
+
+            // Penalize ultra-low-bandwidth home DSL relays (< 10 Mbps) so high-speed backbone relays win
+            int aLowBwPenalty = (a.SpeedMbps > 0.1 && a.SpeedMbps < 10.0) ? 35 : 0;
+            int bLowBwPenalty = (b.SpeedMbps > 0.1 && b.SpeedMbps < 10.0) ? 35 : 0;
+
+            double aCappedSpeed = Math.Min(a.SpeedMbps, 150.0);
+            double bCappedSpeed = Math.Min(b.SpeedMbps, 150.0);
+
+            // Strictly prioritize lowest true 1-RTT latency while rewarding clean >=20 Mbps throughput
+            double aRank = -((aPing + aLowBwPenalty) * 3.2) + (aCappedSpeed * 0.18) - (a.LoadPercent * 0.15);
+            double bRank = -((bPing + bLowBwPenalty) * 3.2) + (bCappedSpeed * 0.18) - (b.LoadPercent * 0.15);
             return bRank.CompareTo(aRank);
         }
 

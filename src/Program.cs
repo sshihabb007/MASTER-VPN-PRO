@@ -15,8 +15,8 @@ using ShihabShieldVpn.UI;
 [assembly: AssemblyCompany("Mehedi Hasan Shihab")]
 [assembly: AssemblyProduct("MASTER VPN PRO")]
 [assembly: AssemblyCopyright("Copyright © 2026 Mehedi Hasan Shihab (sshihabb007)")]
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 [assembly: ComVisible(false)]
 
 namespace ShihabShieldVpn
@@ -314,6 +314,29 @@ namespace ShihabShieldVpn
             check("Dynamic IP Rotation selects fresh unvisited gateway when ACTIVE and pins last gateway when STICKY",
                 dynOrdered.Count == 2 && dynOrdered[0].BareSstpHost == "us2.opengw.net" &&
                 stickyOrdered.Count == 2 && stickyOrdered[0].BareSstpHost == "us1.opengw.net");
+
+            // 3c. Low-Latency Ranking & Latency-Constrained Rotation Regressions
+            List<ShihabVpnServerNode> latencyRankPool = new List<ShihabVpnServerNode>
+            {
+                // Unprobed remote-hinted home DSL node with Tsukuba 3ms hint and 5.5 Mbps
+                new ShihabVpnServerNode { Id = "jp_slow_dsl", HostName = "vpn248153573", SstpEndpoint = "vpn248153573.opengw.net", CountryShort = "JP", WasProbed = true, IsTcp443Reachable = true, IsLocallyProbed = false, IsSstpVerified = false, PingMs = 3, SpeedBps = 5500000L },
+                // Locally-probed 119ms 222 Mbps backbone fiber node
+                new ShihabVpnServerNode { Id = "jp_fast_fiber", HostName = "public-vpn-90", SstpEndpoint = "public-vpn-90.opengw.net", CountryShort = "JP", WasProbed = true, IsTcp443Reachable = true, IsLocallyProbed = true, IsSstpVerified = true, PingMs = 119, SpeedBps = 222000000L }
+            };
+            ShihabPublicRelayService.SortShihabRelays(latencyRankPool);
+            check("Locally-probed 1-RTT backbone gateway outranks unprobed remote-hinted 5.5 Mbps node",
+                latencyRankPool[0].Id == "jp_fast_fiber");
+
+            ShihabAppConfig slowGuardCfg = new ShihabAppConfig { DynamicIpRotation = true };
+            List<ShihabVpnServerNode> slowGuardPool = new List<ShihabVpnServerNode>
+            {
+                new ShihabVpnServerNode { HostName = "sg_fast", SstpEndpoint = "sg_fast.opengw.net", CountryShort = "SG", IsLocallyProbed = true, IsSstpVerified = true, PingMs = 52, SpeedBps = 120000000L },
+                new ShihabVpnServerNode { HostName = "sg_slow", SstpEndpoint = "sg_slow.opengw.net", CountryShort = "SG", IsLocallyProbed = true, IsSstpVerified = true, PingMs = 442, SpeedBps = 8000000L }
+            };
+            ShihabPublicRelayService.RecordShihabRecentHost(slowGuardCfg, "SG", "sg_fast.opengw.net");
+            List<ShihabVpnServerNode> guardedOrder = ShihabPublicRelayService.OrderCandidatesForShihabRotation(slowGuardPool, slowGuardCfg, "SG");
+            check("Latency-constrained Dynamic IP Rotation never jumps from a 52ms verified gateway to a 442ms slow node",
+                guardedOrder.Count == 2 && guardedOrder[0].BareSstpHost == "sg_fast.opengw.net");
 
             int bridgePort = 0;
             bool bridgeRan = false;

@@ -573,7 +573,8 @@ namespace ShihabShieldVpn.Core
                 node.SupportsL2tpIpsec = hasL2tp;
                 node.IsTcp443Reachable = true;
                 node.WasProbed = true;
-                node.IsSstpVerified = true;
+                node.IsLocallyProbed = false;
+                node.IsSstpVerified = false;
                 list.Add(node);
             }
 
@@ -714,7 +715,8 @@ namespace ShihabShieldVpn.Core
                     node.Username = "vpn";
                     node.IsTcp443Reachable = tcpReachable;
                     node.WasProbed = tcpReachable;
-                    node.IsSstpVerified = tcpReachable;
+                    node.IsLocallyProbed = false;
+                    node.IsSstpVerified = false;
 
                     list.Add(node);
                 }
@@ -786,7 +788,8 @@ namespace ShihabShieldVpn.Core
                                 n.Username = "vpn";
                                 n.IsTcp443Reachable = true;
                                 n.WasProbed = true;
-                                n.IsSstpVerified = true;
+                                n.IsLocallyProbed = false;
+                                n.IsSstpVerified = false;
                                 list.Add(n);
                             }
                         }
@@ -837,7 +840,8 @@ namespace ShihabShieldVpn.Core
                                 n.Username = "vpn";
                                 n.IsTcp443Reachable = true;
                                 n.WasProbed = true;
-                                n.IsSstpVerified = true;
+                                n.IsLocallyProbed = false;
+                                n.IsSstpVerified = false;
                                 list.Add(n);
                             }
                         }
