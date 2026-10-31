@@ -166,7 +166,7 @@ namespace ShihabShieldVpn.UI
             _shihabConfig = _shihabConfigService.LoadShihabConfig();
             _shihabOriginGeo = _shihabConfig.OriginGeoCache;
 
-            Title = "Shihab Shield VPN";
+            Title = "MASTER VPN PRO";
             Width = 852;
             Height = 592;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -201,14 +201,14 @@ namespace ShihabShieldVpn.UI
             {
                 _shihabState = ShihabConnectionState.Connected;
                 _shihabConnectedSinceUtc = DateTime.UtcNow;
-                AppendShihabEngineLog("SYSTEM", "Detected existing active Shihab Shield VPN session on startup.");
+                AppendShihabEngineLog("SYSTEM", "Detected existing active MASTER VPN PRO session on startup.");
             }
             else
             {
                 AppendShihabEngineLog(
                     "SYSTEM",
                     string.Format(
-                        "Shihab Shield VPN v1.2.0 initialized • Dynamic IP Rotation={0} • Extended Pool={1}",
+                        "MASTER VPN PRO v1.2.0 initialized • Dynamic IP Rotation={0} • Extended Pool={1}",
                         _shihabConfig.DynamicIpRotation ? "ACTIVE" : "STICKY",
                         _shihabConfig.ShowExtendedCatalog ? "ON" : "COMPACT"));
             }
@@ -318,7 +318,7 @@ namespace ShihabShieldVpn.UI
             Border brandBox = new Border();
             brandBox.Height = 46;
             brandBox.Cursor = Cursors.Hand;
-            brandBox.ToolTip = "Shihab Shield VPN — Open-Source Edition";
+            brandBox.ToolTip = "MASTER VPN PRO — Open-Source Edition";
             brandBox.MouseLeftButtonDown += delegate { SelectShihabNavTab(0); };
 
             ShapePath shieldGlyph = new ShapePath();
@@ -488,23 +488,23 @@ namespace ShihabShieldVpn.UI
             Grid.SetColumn(_headerStatusPillBorder, 0);
             g.Children.Add(_headerStatusPillBorder);
 
-            // Center: Exact "Shihab Shield Open Pro" centered brand title matching screenshot
+            // Center: "MASTER VPN PRO" centered brand title
             StackPanel centerBrand = new StackPanel();
             centerBrand.Orientation = Orientation.Horizontal;
             centerBrand.HorizontalAlignment = HorizontalAlignment.Center;
             centerBrand.VerticalAlignment = VerticalAlignment.Center;
 
             TextBlock titleBold = new TextBlock();
-            titleBold.Text = "Shihab Shield ";
+            titleBold.Text = "MASTER VPN ";
             titleBold.FontSize = 15.5;
             titleBold.FontWeight = FontWeights.Bold;
             titleBold.Foreground = Brushes.White;
 
             TextBlock titleSub = new TextBlock();
-            titleSub.Text = "Open Pro";
+            titleSub.Text = "PRO";
             titleSub.FontSize = 15.0;
-            titleSub.FontWeight = FontWeights.Normal;
-            titleSub.Foreground = BrushHex("#A0AAB8");
+            titleSub.FontWeight = FontWeights.SemiBold;
+            titleSub.Foreground = BrushHex("#38BDF8");
 
             centerBrand.Children.Add(titleBold);
             centerBrand.Children.Add(titleSub);
@@ -556,7 +556,7 @@ namespace ShihabShieldVpn.UI
                 if (_shihabConfig.MinimizeToTrayOnClose)
                 {
                     Hide();
-                    _shihabTray.ShowShihabNotification("Shihab Shield VPN", "Running quietly in the System Tray.");
+                    _shihabTray.ShowShihabNotification("MASTER VPN PRO", "Running quietly in the System Tray.");
                 }
                 else
                 {
@@ -1924,8 +1924,8 @@ namespace ShihabShieldVpn.UI
             btnResetFw.Click += delegate
             {
                 _shihabShieldService.DisarmShihabFirewallKillSwitch(_shihabConfig);
-                AppendShihabEngineLog("SYSTEM", "Cleared Shihab Shield Windows Firewall lock rules.");
-                _bottomBannerStatusText.Text = "Clean: No Shihab Shield firewall block rules active.";
+                AppendShihabEngineLog("SYSTEM", "Cleared MASTER VPN PRO Windows Firewall lock rules.");
+                _bottomBannerStatusText.Text = "Clean: No MASTER VPN PRO firewall block rules active.";
             };
             DockPanel.SetDock(btnResetFw, Dock.Right);
             fwRow.Children.Add(btnResetFw);
@@ -2063,7 +2063,7 @@ namespace ShihabShieldVpn.UI
             StackPanel nameStack = new StackPanel();
             nameStack.Children.Add(new TextBlock
             {
-                Text = "Shihab Shield VPN — Open-Source Edition v1.2.0",
+                Text = "MASTER VPN PRO — Open-Source Edition v1.2.0",
                 FontSize = 17.5,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White
@@ -2102,7 +2102,7 @@ namespace ShihabShieldVpn.UI
 
             st.Children.Add(new TextBlock
             {
-                Text = "Focused on building fast, clean, user-centric desktop tools and full-stack web applications. Shihab Shield VPN v1.2.0 unifies an extended 70+ country open relay catalog, interactive 3D Fibonacci Globe & Shield route visualization, Dynamic IP Rotation, live GeoIP/ISP/ASN & IP-leak auditing, 1-click .ovpn profile export, and private MS-SSTP, IKEv2, L2TP/IPsec, PPTP, WireGuard (.conf), OpenVPN (.ovpn), and DPAPI-secured HTTP/HTTPS System Proxy support.",
+                Text = "Focused on building fast, clean, user-centric desktop tools and full-stack web applications. MASTER VPN PRO v1.2.0 unifies an extended 70+ country open relay catalog, interactive 3D Fibonacci Globe & Shield route visualization, Dynamic IP Rotation, live GeoIP/ISP/ASN & IP-leak auditing, 1-click .ovpn profile export, Chrome/Brave Browser Companion Sync, and private MS-SSTP, IKEv2, L2TP/IPsec, PPTP, WireGuard (.conf), OpenVPN (.ovpn), and DPAPI-secured HTTP/HTTPS System Proxy support.",
                 FontSize = 12.2,
                 Foreground = BrushHex("#C4CCD8"),
                 TextWrapping = TextWrapping.Wrap,
@@ -2121,7 +2121,7 @@ namespace ShihabShieldVpn.UI
             StackPanel rows = new StackPanel();
             rows.Children.Add(CreateDeveloperInfoRow("Developer:", "Mehedi Hasan Shihab (Web & Software Developer)", null));
             rows.Children.Add(CreateDeveloperInfoRow("Portfolio:", "https://sshihabb007.github.io/", "https://sshihabb007.github.io/"));
-            rows.Children.Add(CreateDeveloperInfoRow("Email Me:", "sshihabb007@gmail.com", "mailto:sshihabb007@gmail.com?subject=Shihab%20Shield%20VPN"));
+            rows.Children.Add(CreateDeveloperInfoRow("Email Me:", "sshihabb007@gmail.com", "mailto:sshihabb007@gmail.com?subject=MASTER%20VPN%20PRO"));
             rows.Children.Add(CreateDeveloperInfoRow("GitHub:", "github.com/sshihabb007 (@sshihabb007)", "https://github.com/sshihabb007"));
             rows.Children.Add(CreateDeveloperInfoRow("LinkedIn:", "linkedin.com/in/mehedi-hasan-shihab", "https://www.linkedin.com/in/mehedi-hasan-shihab"));
             linksBox.Child = rows;
@@ -2301,7 +2301,7 @@ namespace ShihabShieldVpn.UI
                 AppendShihabEngineLog("TUNNEL", establishedMsg);
 
                 _shihabTray.ShowShihabNotification(
-                    "Shihab Shield Connected",
+                    "MASTER VPN PRO Connected",
                     string.Format("{0} ({1})", _shihabResolvedTarget.CountryLong, _shihabResolvedTarget.IpAddress));
 
                 VerifyShihabGeoIpInBackgroundAsync(false);

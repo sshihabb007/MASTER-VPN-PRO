@@ -40,7 +40,7 @@ function createDefaultShihabState() {
       {
         ts: formatNowClock(),
         cat: "SYSTEM",
-        msg: "Shihab Shield VPN Extension v1.2.0 ready (Chrome / Brave MV3)."
+        msg: "MASTER VPN PRO Extension v1.2.0 ready (Chrome / Brave MV3)."
       }
     ]
   };
@@ -642,7 +642,7 @@ async function handleShihabConnect(state, targetSpec) {
 
   if (useDesktop) {
     if (!desktopStatus) {
-      throw new Error("ShihabShieldVPN.exe Desktop Engine is not running. Launch ShihabShieldVPN.exe or switch Engine Mode to Standalone Browser Proxy.");
+      throw new Error("MASTER VPN PRO Desktop Engine is not running. Launch MasterVpnPro.exe or switch Engine Mode to Standalone Browser Proxy.");
     }
     await clearShihabBrowserProxySettings();
     await postShihabDesktopBridge("/api/shihab/connect", {
@@ -652,7 +652,7 @@ async function handleShihabConnect(state, targetSpec) {
     state.activeMode = "desktop";
     state.connected = true;
     state.connectedSinceMs = Date.now();
-    appendShihabLog(state, "TUNNEL", "Triggered ShihabShieldVPN.exe Desktop MS-SSTP Tunnel (" + (state.selectedCountryCode || "AUTO") + ").");
+    appendShihabLog(state, "TUNNEL", "Triggered MASTER VPN PRO Desktop MS-SSTP Tunnel (" + (state.selectedCountryCode || "AUTO") + ").");
     await updateToolbarBadge(true, state.selectedCountryCode === "AUTO" ? "VPN" : state.selectedCountryCode);
     await saveShihabState(state);
     return;
@@ -707,7 +707,7 @@ async function handleShihabRotateIp(state) {
   const desktopStatus = await queryShihabDesktopBridgeStatus();
   if (state.activeMode === "desktop" || (desktopStatus && desktopStatus.connected)) {
     await postShihabDesktopBridge("/api/shihab/rotate-ip", {});
-    appendShihabLog(state, "TUNNEL", "Requested Dynamic IP Rotation on ShihabShieldVPN.exe Desktop Engine.");
+    appendShihabLog(state, "TUNNEL", "Requested Dynamic IP Rotation on MASTER VPN PRO Desktop Engine.");
     await saveShihabState(state);
     return;
   }

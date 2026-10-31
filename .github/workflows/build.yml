@@ -1,4 +1,4 @@
-name: Build & Release Shihab Shield VPN (All Platforms)
+name: Build & Release MASTER VPN PRO (All Platforms)
 
 on:
   push:
@@ -110,11 +110,11 @@ jobs:
           $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.2.0' }
           $VerClean = $TagVer.TrimStart('v')
 
-          $PortableName = "Shihab-Shield-VPN-Portable-$VerClean.exe"
-          $SetupName    = "Shihab-Shield-VPN-Setup-$VerClean.exe"
-          $ExtZipName   = "Shihab-Shield-VPN-Browser-Extension-$VerClean.zip"
-          $ExtCrxName   = "Shihab-Shield-VPN-Browser-Extension-$VerClean.crx"
-          $ApkName      = "Shihab-Shield-VPN-Android-$VerClean.apk"
+          $PortableName = "MASTER-VPN-PRO-Portable-$VerClean.exe"
+          $SetupName    = "MASTER-VPN-PRO-Setup-$VerClean.exe"
+          $ExtZipName   = "MASTER-VPN-PRO-Browser-Extension-$VerClean.zip"
+          $ExtCrxName   = "MASTER-VPN-PRO-Browser-Extension-$VerClean.crx"
+          $ApkName      = "MASTER-VPN-PRO-Android-$VerClean.apk"
 
           foreach ($req in @($PortableName, $SetupName, $ExtZipName, $ApkName)) {
             $src = Join-Path $PWD "dist\$req"
@@ -140,7 +140,7 @@ jobs:
           Set-Content -Path (Join-Path $PWD "release-dist\SHA256SUMS.txt") -Value ($SumsLines -join "`r`n") -Encoding UTF8
 
           $NotesTemplate = @'
-          ## Shihab Shield VPN {{TAG_VER}} — Windows Desktop, Chrome/Brave Extension & Android APK
+          ## MASTER VPN PRO {{TAG_VER}} — Windows Desktop, Chrome/Brave Extension & Android APK
 
           Official open-source multi-platform release engineered by **Mehedi Hasan Shihab**:
 
@@ -173,12 +173,12 @@ jobs:
       - name: Upload Multiplatform Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Shihab-Shield-VPN-All-Platforms
+          name: MASTER-VPN-PRO-All-Platforms
           path: |
-            release-dist/Shihab-Shield-VPN-Setup-*.exe
-            release-dist/Shihab-Shield-VPN-Portable-*.exe
-            release-dist/Shihab-Shield-VPN-Browser-Extension-*
-            release-dist/Shihab-Shield-VPN-Android-*.apk
+            release-dist/MASTER-VPN-PRO-Setup-*.exe
+            release-dist/MASTER-VPN-PRO-Portable-*.exe
+            release-dist/MASTER-VPN-PRO-Browser-Extension-*
+            release-dist/MASTER-VPN-PRO-Android-*.apk
             release-dist/SHA256SUMS.txt
           if-no-files-found: error
 
@@ -198,12 +198,12 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          name: "Shihab Shield VPN ${{ github.ref_name }} — Windows, Chrome/Brave & Android (Mehedi Hasan Shihab)"
+          name: "MASTER VPN PRO ${{ github.ref_name }} — Windows, Chrome/Brave & Android (Mehedi Hasan Shihab)"
           body_path: release-dist/RELEASE_NOTES.md
           make_latest: "true"
           files: |
-            release-dist/Shihab-Shield-VPN-Setup-*.exe
-            release-dist/Shihab-Shield-VPN-Portable-*.exe
-            release-dist/Shihab-Shield-VPN-Browser-Extension-*
-            release-dist/Shihab-Shield-VPN-Android-*.apk
+            release-dist/MASTER-VPN-PRO-Setup-*.exe
+            release-dist/MASTER-VPN-PRO-Portable-*.exe
+            release-dist/MASTER-VPN-PRO-Browser-Extension-*
+            release-dist/MASTER-VPN-PRO-Android-*.apk
             release-dist/SHA256SUMS.txt

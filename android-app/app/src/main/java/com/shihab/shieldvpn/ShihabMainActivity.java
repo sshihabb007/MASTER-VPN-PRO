@@ -191,7 +191,7 @@ public class ShihabMainActivity extends Activity {
         bar.addView(mTopStatusPill);
 
         TextView title = new TextView(this);
-        title.setText("Shihab Shield Open Pro");
+        title.setText("MASTER VPN PRO");
         title.setTextColor(Color.WHITE);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
@@ -736,7 +736,7 @@ public class ShihabMainActivity extends Activity {
 
         LinearLayout card = makeBentoCard();
         TextView t1 = new TextView(this);
-        t1.setText("Shihab Shield VPN — Android Edition v1.2.0");
+        t1.setText("MASTER VPN PRO — Android Edition v1.2.0");
         t1.setTextColor(Color.WHITE);
         t1.setTypeface(Typeface.DEFAULT_BOLD);
         t1.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.5f);
@@ -1155,11 +1155,11 @@ public class ShihabMainActivity extends Activity {
         }
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm != null) {
-            cm.setPrimaryClip(ClipData.newPlainText("ShihabShield.ovpn", ovpn));
+            cm.setPrimaryClip(ClipData.newPlainText("MasterVpnPro.ovpn", ovpn));
         }
         Intent send = new Intent(Intent.ACTION_SEND);
         send.setType("text/plain");
-        send.putExtra(Intent.EXTRA_SUBJECT, "ShihabShield_" + node.countryShort + "_" + node.host + ".ovpn");
+        send.putExtra(Intent.EXTRA_SUBJECT, "MasterVpnPro_" + node.countryShort + "_" + node.host + ".ovpn");
         send.putExtra(Intent.EXTRA_TEXT, ovpn);
         startActivity(Intent.createChooser(send, "Export .ovpn Profile (Copied to Clipboard)"));
     }

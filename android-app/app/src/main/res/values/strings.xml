@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Shihab Shield VPN</string>
-    <string name="vpn_notification_channel">Shihab Shield Tunnel Status</string>
+    <string name="app_name">MASTER VPN PRO</string>
+    <string name="vpn_notification_channel">MASTER VPN PRO Tunnel Status</string>
 </resources>
-

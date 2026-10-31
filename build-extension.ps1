@@ -41,7 +41,7 @@ if ($manifestObj.manifest_version -ne 3) {
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-$OutZip = Join-Path $DistDir "Shihab-Shield-VPN-Browser-Extension-$Version.zip"
+$OutZip = Join-Path $DistDir "MASTER-VPN-PRO-Browser-Extension-$Version.zip"
 if (Test-Path -LiteralPath $OutZip) {
     Remove-Item -LiteralPath $OutZip -Force
 }
@@ -81,7 +81,7 @@ foreach ($cand in @(
     }
 }
 
-$OutCrx = Join-Path $DistDir "Shihab-Shield-VPN-Browser-Extension-$Version.crx"
+$OutCrx = Join-Path $DistDir "MASTER-VPN-PRO-Browser-Extension-$Version.crx"
 if ($BrowserBin) {
     $KeyPem = Join-Path $ObjDir "shihab_browser_ext.pem"
     $TempStageExt = Join-Path $ObjDir "crx_pack_stage"

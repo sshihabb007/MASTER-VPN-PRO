@@ -8,10 +8,10 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyTitle("Shihab Shield VPN Setup")]
-[assembly: AssemblyDescription("Official Windows Setup Wizard & Uninstaller for Shihab Shield VPN (Mehedi Hasan Shihab)")]
+[assembly: AssemblyTitle("MASTER VPN PRO Setup")]
+[assembly: AssemblyDescription("Official Windows Setup Wizard & Uninstaller for MASTER VPN PRO (Mehedi Hasan Shihab)")]
 [assembly: AssemblyCompany("Mehedi Hasan Shihab")]
-[assembly: AssemblyProduct("Shihab Shield VPN")]
+[assembly: AssemblyProduct("MASTER VPN PRO")]
 [assembly: AssemblyCopyright("Copyright © 2026 Mehedi Hasan Shihab (sshihabb007)")]
 [assembly: AssemblyVersion("1.2.0.0")]
 [assembly: AssemblyFileVersion("1.2.0.0")]
@@ -21,13 +21,13 @@ namespace ShihabShieldVpnInstaller
 {
     public static class SetupProgram
     {
-        public const string ProductName = "Shihab Shield VPN";
+        public const string ProductName = "MASTER VPN PRO";
         public const string ProductVersion = "1.2.0";
         public const string PublisherName = "Mehedi Hasan Shihab";
-        public const string MainExeName = "ShihabShieldVPN.exe";
-        public const string UninstallKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\ShihabShieldVPN";
+        public const string MainExeName = "MasterVpnPro.exe";
+        public const string UninstallKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\MasterVpnPro";
         public const string StartupRunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        public const string StartupValueName = "ShihabShieldVPN";
+        public const string StartupValueName = "MasterVpnPro";
 
         [STAThread]
         public static int Main(string[] args)
@@ -40,7 +40,7 @@ namespace ShihabShieldVpnInstaller
 
             string defaultDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                @"Programs\Shihab Shield VPN");
+                @"Programs\MASTER VPN PRO");
             string targetDir = string.IsNullOrWhiteSpace(customDir) ? defaultDir : customDir;
 
             if (silent)
@@ -214,20 +214,24 @@ namespace ShihabShieldVpnInstaller
 
         private static void StopRunningShihabInstances()
         {
-            try
+            string[] names = new string[] { "MasterVpnPro", "MASTER VPN PRO", "ShihabShieldVPN" };
+            for (int n = 0; n < names.Length; n++)
             {
-                Process[] procs = Process.GetProcessesByName("ShihabShieldVPN");
-                for (int i = 0; i < procs.Length; i++)
+                try
                 {
-                    try
+                    Process[] procs = Process.GetProcessesByName(names[n]);
+                    for (int i = 0; i < procs.Length; i++)
                     {
-                        procs[i].Kill();
-                        procs[i].WaitForExit(2000);
+                        try
+                        {
+                            procs[i].Kill();
+                            procs[i].WaitForExit(2000);
+                        }
+                        catch { }
                     }
-                    catch { }
                 }
+                catch { }
             }
-            catch { }
         }
 
         private static void CreateWindowsShortcut(string lnkPath, string targetExe, string workDir, string description)
@@ -279,7 +283,7 @@ namespace ShihabShieldVpnInstaller
         public ShihabSetupForm(string initialDir, bool uninstallMode)
         {
             _isUninstall = uninstallMode;
-            Text = uninstallMode ? "Uninstall Shihab Shield VPN" : "Shihab Shield VPN v1.0.0 — Setup Wizard";
+            Text = uninstallMode ? "Uninstall MASTER VPN PRO" : "MASTER VPN PRO v1.2.0 — Setup Wizard";
             ClientSize = new Size(540, 390);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -292,7 +296,7 @@ namespace ShihabShieldVpnInstaller
 
             Label header = new Label
             {
-                Text = uninstallMode ? "Remove Shihab Shield VPN" : "Install Shihab Shield VPN v1.0.0",
+                Text = uninstallMode ? "Remove MASTER VPN PRO" : "Install MASTER VPN PRO v1.2.0",
                 Font = new Font("Segoe UI", 15f, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(24, 20),
@@ -313,7 +317,7 @@ namespace ShihabShieldVpnInstaller
             Label planLbl = new Label
             {
                 Text = uninstallMode
-                    ? "Planned action: Stop running Shihab Shield VPN instance, remove shortcuts, and delete installed files."
+                    ? "Planned action: Stop running MASTER VPN PRO instance, remove shortcuts, and delete installed files."
                     : "Planned changes (applied only after you click Install):",
                 ForeColor = Color.FromArgb(170, 178, 192),
                 Location = new Point(26, 86),
@@ -336,7 +340,7 @@ namespace ShihabShieldVpnInstaller
             _chkDesktop = new CheckBox { Text = "Create Desktop shortcut", Checked = true, Location = new Point(26, 168), AutoSize = true, Visible = !uninstallMode };
             _chkStartMenu = new CheckBox { Text = "Create Start Menu shortcuts & Windows Uninstall entry", Checked = true, Location = new Point(26, 196), AutoSize = true, Visible = !uninstallMode };
             _chkStartup = new CheckBox { Text = "Start minimized in System Tray with Windows", Checked = false, Location = new Point(26, 224), AutoSize = true, Visible = !uninstallMode };
-            _chkLaunchNow = new CheckBox { Text = "Launch Shihab Shield VPN after installation completes", Checked = true, Location = new Point(26, 252), AutoSize = true, Visible = !uninstallMode };
+            _chkLaunchNow = new CheckBox { Text = "Launch MASTER VPN PRO after installation completes", Checked = true, Location = new Point(26, 252), AutoSize = true, Visible = !uninstallMode };
 
             Controls.Add(_chkDesktop);
             Controls.Add(_chkStartMenu);
@@ -386,10 +390,10 @@ namespace ShihabShieldVpnInstaller
             {
                 if (_isUninstall)
                 {
-                    _statusLabel.Text = "Uninstalling Shihab Shield VPN...";
+                    _statusLabel.Text = "Uninstalling MASTER VPN PRO...";
                     Application.DoEvents();
                     SetupProgram.PerformShihabUninstall(_dirBox.Text.Trim(), true, false);
-                    MessageBox.Show(this, "Shihab Shield VPN has been uninstalled cleanly.", "Uninstall Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(this, "MASTER VPN PRO has been uninstalled cleanly.", "Uninstall Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     Close();
                 }
                 else

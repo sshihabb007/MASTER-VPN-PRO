@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Shihab Shield VPN — Open Pro",
-  "short_name": "Shihab Shield VPN",
+  "name": "MASTER VPN PRO",
+  "short_name": "MASTER VPN PRO",
   "version": "1.2.0",
-  "description": "Open-Source Browser VPN & Proxy Shield for Chrome & Brave: 70+ Country Desktop Tunnel Sync, Standalone Proxy PAC, Split-Tunneling, 3D Globe & Leak Audit by Mehedi Hasan Shihab.",
+  "description": "MASTER VPN PRO — Open-Source Browser VPN & Proxy Shield for Chrome & Brave: 70+ Country Desktop Tunnel Sync, Standalone Proxy PAC, Split-Tunneling, 3D Globe & Leak Audit by Mehedi Hasan Shihab.",
   "author": "Mehedi Hasan Shihab (sshihabb007)",
   "permissions": [
     "proxy",
@@ -21,7 +21,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Shihab Shield VPN — Open Pro",
+    "default_title": "MASTER VPN PRO",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -37,4 +37,3 @@
     "128": "icons/icon128.png"
   }
 }
-

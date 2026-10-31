@@ -28,13 +28,13 @@ namespace ShihabShieldVpn.UI
             _menu.ShowImageMargin = false;
             _menu.Font = new Font("Segoe UI", 9.2f, FontStyle.Regular);
 
-            _statusItem = new ToolStripMenuItem("Shihab Shield VPN — Disconnected");
+            _statusItem = new ToolStripMenuItem("MASTER VPN PRO — Disconnected");
             _statusItem.Enabled = false;
 
             _toggleConnectItem = new ToolStripMenuItem("⚡  Quick Connect (Auto)");
             _toggleConnectItem.Click += delegate { Raise(ToggleConnectRequested); };
 
-            ToolStripMenuItem openItem = new ToolStripMenuItem("🛡  Open Shihab Shield Dashboard");
+            ToolStripMenuItem openItem = new ToolStripMenuItem("🛡  Open MASTER VPN PRO Dashboard");
             openItem.Click += delegate { Raise(OpenDashboardRequested); };
 
             ToolStripMenuItem speedItem = new ToolStripMenuItem("🚀  Run Speed Benchmark");
@@ -66,7 +66,7 @@ namespace ShihabShieldVpn.UI
 
             _notifyIcon = new NotifyIcon();
             _notifyIcon.Icon = exeIcon ?? SystemIcons.Shield;
-            _notifyIcon.Text = "Shihab Shield VPN (Disconnected)";
+            _notifyIcon.Text = "MASTER VPN PRO (Disconnected)";
             _notifyIcon.ContextMenuStrip = _menu;
             _notifyIcon.Visible = true;
             _notifyIcon.DoubleClick += delegate { Raise(OpenDashboardRequested); };
@@ -80,14 +80,14 @@ namespace ShihabShieldVpn.UI
                 string label = string.Format("Connected: {0} ({1})", locationTitle ?? "VPN", ipAddress ?? "");
                 _statusItem.Text = label;
                 _toggleConnectItem.Text = "■  Disconnect VPN Tunnel";
-                string tip = "Shihab Shield: " + (locationTitle ?? "Connected");
+                string tip = "MASTER VPN PRO: " + (locationTitle ?? "Connected");
                 _notifyIcon.Text = tip.Length > 62 ? tip.Substring(0, 62) : tip;
             }
             else
             {
-                _statusItem.Text = "Shihab Shield VPN — Disconnected";
+                _statusItem.Text = "MASTER VPN PRO — Disconnected";
                 _toggleConnectItem.Text = "⚡  Quick Connect (" + (locationTitle ?? "Auto") + ")";
-                _notifyIcon.Text = "Shihab Shield VPN — Ready";
+                _notifyIcon.Text = "MASTER VPN PRO — Ready";
             }
         }
 

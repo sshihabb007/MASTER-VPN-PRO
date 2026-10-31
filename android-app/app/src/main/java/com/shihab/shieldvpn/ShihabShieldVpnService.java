@@ -113,7 +113,7 @@ public class ShihabShieldVpnService extends VpnService {
 
         try {
             Builder builder = new Builder();
-            builder.setSession("Shihab Shield VPN (" + safeCc + ")");
+            builder.setSession("MASTER VPN PRO (" + safeCc + ")");
             builder.setMtu(1400);
             builder.addAddress("10.214.0.2", 30);
 
@@ -205,7 +205,7 @@ public class ShihabShieldVpnService extends VpnService {
         if (wasActive) {
             new ShihabModels.ShihabPreferencesStore(this).appendLog(
                     "TUNNEL",
-                    "Shihab Shield VpnService tunnel disconnected cleanly.");
+                    "MASTER VPN PRO VpnService tunnel disconnected cleanly.");
         }
     }
 
@@ -251,7 +251,7 @@ public class ShihabShieldVpnService extends VpnService {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
             NotificationChannel ch = new NotificationChannel(
                     CHANNEL_ID,
-                    "Shihab Shield VPN Status",
+                    "MASTER VPN PRO Status",
                     NotificationManager.IMPORTANCE_LOW);
             ch.setDescription("Active VPN tunnel & DNS protection status");
             nm.createNotificationChannel(ch);
@@ -277,7 +277,7 @@ public class ShihabShieldVpnService extends VpnService {
                 : new Notification.Builder(this);
 
         nb.setSmallIcon(android.R.drawable.ic_lock_lock)
-                .setContentTitle("Shihab Shield VPN Protected")
+                .setContentTitle("MASTER VPN PRO Protected")
                 .setContentText(detailText)
                 .setOngoing(true)
                 .setContentIntent(openPending)

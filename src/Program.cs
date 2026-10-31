@@ -10,10 +10,10 @@ using ShihabShieldVpn.Core;
 using ShihabShieldVpn.Services;
 using ShihabShieldVpn.UI;
 
-[assembly: AssemblyTitle("Shihab Shield VPN")]
-[assembly: AssemblyDescription("Portable Open-Source Multi-Protocol Windows VPN Client (Mehedi Hasan Shihab)")]
+[assembly: AssemblyTitle("MASTER VPN PRO")]
+[assembly: AssemblyDescription("MASTER VPN PRO — Portable Open-Source Multi-Protocol Windows VPN Client (Mehedi Hasan Shihab)")]
 [assembly: AssemblyCompany("Mehedi Hasan Shihab")]
-[assembly: AssemblyProduct("Shihab Shield VPN")]
+[assembly: AssemblyProduct("MASTER VPN PRO")]
 [assembly: AssemblyCopyright("Copyright © 2026 Mehedi Hasan Shihab (sshihabb007)")]
 [assembly: AssemblyVersion("1.2.0.0")]
 [assembly: AssemblyFileVersion("1.2.0.0")]
@@ -176,7 +176,7 @@ namespace ShihabShieldVpn
                     ShihabSecurityShieldService shield = new ShihabSecurityShieldService(cfgSvc);
                     shield.DisarmShihabFirewallKillSwitch(cfg);
                     cfgSvc.SaveShihabConfig(cfg);
-                    WriteShihabReport(outFile, "OK: Disconnected Shihab Shield VPN tunnel & restored system proxy.");
+                    WriteShihabReport(outFile, "OK: Disconnected MASTER VPN PRO tunnel & restored system proxy.");
                     return 0;
                 }
 

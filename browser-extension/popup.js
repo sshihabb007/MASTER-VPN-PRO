@@ -85,7 +85,7 @@
           lon: 90.41
         },
         logs: [
-          { ts: "12:18:00", cat: "SYSTEM", msg: "Shihab Shield VPN Extension v1.2.0 ready (Chrome / Brave MV3)." }
+          { ts: "12:18:00", cat: "SYSTEM", msg: "MASTER VPN PRO Extension v1.2.0 ready (Chrome / Brave MV3)." }
         ]
       },
       desktopBridge,
@@ -208,7 +208,7 @@
 
     let cc = st.selectedCountryCode || "US";
     let title = cc === "AUTO" ? "Auto — Fastest Gateway" : resolveShihabCountryMeta(cc).name;
-    let sub = db ? "70+ Countries via ShihabShieldVPN.exe" : "Standalone Browser Proxy Shield";
+    let sub = db ? "70+ Countries via MASTER VPN PRO Desktop" : "Standalone Browser Proxy Shield";
     let ipShown = (st.currentGeo && st.currentGeo.ipAddress) || "—";
     let protoShown = db ? "MS-SSTP TLS" : "PAC Proxy";
     let pingShown = (st.lastPingMs || 24) + " ms";
@@ -440,7 +440,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "ShihabShield_" + item.countryShort + "_" + item.ipAddress + ".ovpn";
+      a.download = "MasterVpnPro_" + item.countryShort + "_" + item.ipAddress + ".ovpn";
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -479,7 +479,7 @@
   }
 
   async function triggerConnect(target) {
-    setBanner("Negotiating Shihab Shield route...");
+    setBanner("Negotiating MASTER VPN PRO route...");
     const res = await sendBg("SHIHAB_CONNECT", { target: target || {} });
     if (!res.ok) {
       setBanner("Error: " + res.error);

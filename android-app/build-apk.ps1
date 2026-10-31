@@ -95,7 +95,7 @@ $SourcesList = Join-Path $ObjDir "javac_sources.txt"
 $DexDir = Join-Path $ObjDir "dex"
 $UnalignedApk = Join-Path $ObjDir "unaligned.apk"
 $AlignedApk = Join-Path $ObjDir "aligned.apk"
-$OutApk = Join-Path $DistDir "Shihab-Shield-VPN-Android-$Version.apk"
+$OutApk = Join-Path $DistDir "MASTER-VPN-PRO-Android-$Version.apk"
 
 Remove-Item -LiteralPath $ObjDir -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $GenJavaDir, $ClassesDir, $DexDir | Out-Null

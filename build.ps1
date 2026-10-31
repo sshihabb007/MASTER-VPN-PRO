@@ -12,15 +12,15 @@ $ObjDir = Join-Path $ProjectRoot "obj"
 $AssetsDir = Join-Path $ProjectRoot "assets"
 $IconPath = Join-Path $AssetsDir "app.ico"
 $ManifestPath = Join-Path $ProjectRoot "src\app.manifest"
-$OutExe = Join-Path $DistDir "ShihabShieldVPN.exe"
-$PortableReleaseExe = Join-Path $DistDir "Shihab-Shield-VPN-Portable-$Version.exe"
-$SetupReleaseExe = Join-Path $DistDir "Shihab-Shield-VPN-Setup-$Version.exe"
+$OutExe = Join-Path $DistDir "MasterVpnPro.exe"
+$PortableReleaseExe = Join-Path $DistDir "MASTER-VPN-PRO-Portable-$Version.exe"
+$SetupReleaseExe = Join-Path $DistDir "MASTER-VPN-PRO-Setup-$Version.exe"
 
 New-Item -ItemType Directory -Force -Path $DistDir, $ObjDir | Out-Null
 
-$RunningProcs = Get-Process -Name "ShihabShieldVPN" -ErrorAction SilentlyContinue
+$RunningProcs = Get-Process -Name @("MasterVpnPro", "MASTER VPN PRO", "ShihabShieldVPN") -ErrorAction SilentlyContinue
 if ($RunningProcs) {
-    Write-Host "[0/6] Stopping running ShihabShieldVPN instance before rebuild..."
+    Write-Host "[0/6] Stopping running MASTER VPN PRO instance before rebuild..."
     $RunningProcs | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 350
 }
@@ -43,7 +43,7 @@ if (-not (Test-Path $Csc)) {
 
 $Sources = Get-ChildItem -Path (Join-Path $ProjectRoot "src") -Recurse -Filter "*.cs" | Select-Object -ExpandProperty FullName
 
-Write-Host "[2/6] Compiling Portable ShihabShieldVPN.exe (AnyCPU: native x64 / ARM64 / x86)..."
+Write-Host "[2/6] Compiling Portable MasterVpnPro.exe (AnyCPU: native x64 / ARM64 / x86)..."
 & $Csc `
     /nologo `
     /target:winexe `
@@ -98,7 +98,7 @@ if (Test-Path $StageDir) { Remove-Item -LiteralPath $StageDir -Recurse -Force }
 if (Test-Path $PayloadZip) { Remove-Item -LiteralPath $PayloadZip -Force }
 
 New-Item -ItemType Directory -Force -Path $StageDir | Out-Null
-Copy-Item -LiteralPath $OutExe -Destination (Join-Path $StageDir "ShihabShieldVPN.exe") -Force
+Copy-Item -LiteralPath $OutExe -Destination (Join-Path $StageDir "MasterVpnPro.exe") -Force
 if (Test-Path (Join-Path $ProjectRoot "README.md")) {
     Copy-Item -LiteralPath (Join-Path $ProjectRoot "README.md") -Destination (Join-Path $StageDir "README.md") -Force
 }
@@ -147,14 +147,14 @@ try {
     if ($instProc.ExitCode -ne 0) {
         throw "Silent setup exited with code $($instProc.ExitCode)"
     }
-    $installedApp = Join-Path $SmokeDir "ShihabShieldVPN.exe"
+    $installedApp = Join-Path $SmokeDir "MasterVpnPro.exe"
     $installedUninst = Join-Path $SmokeDir "Uninstall.exe"
     if (-not (Test-Path $installedApp) -or -not (Test-Path $installedUninst)) {
         throw "Setup smoke test missing expected extracted files in $SmokeDir"
     }
     $extractedHash = (Get-FileHash -LiteralPath $installedApp -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($extractedHash -ne $PortableSha) {
-        throw "Extracted ShihabShieldVPN.exe hash ($extractedHash) does not match portable build ($PortableSha)"
+        throw "Extracted MasterVpnPro.exe hash ($extractedHash) does not match portable build ($PortableSha)"
     }
 
     $uninstProc = Start-Process -FilePath $installedUninst -ArgumentList @("--uninstall", "--silent", "--no-registry", "--install-dir", $SmokeDir) -Wait -PassThru
@@ -173,15 +173,15 @@ finally {
     }
 }
 
-# Remove any temporary config/cache generated next to dist\ShihabShieldVPN.exe during self-test
+# Remove any temporary config/cache generated next to dist\MasterVpnPro.exe during self-test
 Get-ChildItem -Path $DistDir -Include "*.json", "*.pbk" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 
 if (-not $SkipDesktopCopy) {
     $DesktopDir = [Environment]::GetFolderPath("Desktop")
-    $DesktopExe = Join-Path $DesktopDir "ShihabShieldVPN.exe"
+    $DesktopExe = Join-Path $DesktopDir "MASTER VPN PRO.exe"
     Write-Host "[6/6] Copying verified portable .exe to Desktop: $DesktopExe"
     Copy-Item -Path $OutExe -Destination $DesktopExe -Force
 }
 
-Write-Host "SUCCESS! Both Portable and Setup Installer executables are ready in dist\."
+Write-Host "SUCCESS! MASTER VPN PRO Portable and Setup Installer executables are ready in dist\."
 

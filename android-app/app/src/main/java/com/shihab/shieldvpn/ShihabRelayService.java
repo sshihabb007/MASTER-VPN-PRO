@@ -53,7 +53,7 @@ public final class ShihabRelayService {
             conn.setConnectTimeout(timeoutMs);
             conn.setReadTimeout(timeoutMs);
             conn.setUseCaches(false);
-            conn.setRequestProperty("User-Agent", "ShihabShieldVPN-Android/1.2.0");
+            conn.setRequestProperty("User-Agent", "MasterVpnPro-Android/1.2.0");
             int status = conn.getResponseCode();
             if (status < 200 || status >= 300) {
                 throw new Exception("HTTP " + status + " from " + urlString);
