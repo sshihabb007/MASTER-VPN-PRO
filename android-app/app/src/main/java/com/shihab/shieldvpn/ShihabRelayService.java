@@ -41,8 +41,6 @@ import java.util.concurrent.TimeUnit;
  */
 public final class ShihabRelayService {
 
-    private static final String PROXIFLY_HTTPS_URL =
-            "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/https/data.json";
     private static final String MONOSANS_JSON_URL =
             "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies.json";
     private static final String IPSPEED_OVPN_URL =
@@ -61,7 +59,7 @@ public final class ShihabRelayService {
             conn.setConnectTimeout(timeoutMs);
             conn.setReadTimeout(timeoutMs);
             conn.setUseCaches(false);
-            conn.setRequestProperty("User-Agent", "MasterVpnPro-Android/1.3.0");
+            conn.setRequestProperty("User-Agent", "MasterVpnPro-Android/1.3.1");
             int status = conn.getResponseCode();
             if (status < 200 || status >= 300) {
                 throw new Exception("HTTP " + status + " from " + urlString);
@@ -86,47 +84,7 @@ public final class ShihabRelayService {
         List<ShihabRelayNode> combined = new ArrayList<ShihabRelayNode>();
         Set<String> seenKeys = new HashSet<String>();
 
-        // 1. Proxifly HTTPS-CONNECT Proxies (Android 10+ VpnService.Builder.setHttpProxy compatible)
-        try {
-            String raw = httpGetText(PROXIFLY_HTTPS_URL, 7000);
-            JSONArray arr = new JSONArray(raw);
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject item = arr.optJSONObject(i);
-                if (item == null) continue;
-                String ip = item.optString("ip", "").trim();
-                int port = item.optInt("port", 0);
-                if (ip.isEmpty() || port <= 0 || port > 65535) continue;
-
-                JSONObject geo = item.optJSONObject("geolocation");
-                String cc = geo != null ? geo.optString("country", "").trim().toUpperCase(Locale.US) : "";
-                if (cc.length() != 2 || "ZZ".equals(cc)) continue;
-
-                String dedup = "PROXY:" + ip + ":" + port;
-                if (!seenKeys.add(dedup)) continue;
-
-                ShihabCountryInfo meta = ShihabModels.resolveShihabCountry(cc, "");
-                ShihabRelayNode n = new ShihabRelayNode();
-                n.id = dedup;
-                n.sourceType = "OPEN_PROXY";
-                n.countryShort = meta.code;
-                n.countryLong = meta.name;
-                n.cityName = (geo != null && !geo.optString("city", "").isEmpty())
-                        ? geo.optString("city")
-                        : meta.city;
-                n.regionGroup = meta.region;
-                n.protocol = "HTTPS";
-                n.host = ip;
-                n.port = port;
-                n.pingMs = Math.max(18, Math.min(240, 100 - item.optInt("score", 50)));
-                n.speedMbps = 28.0;
-                n.lat = meta.lat;
-                n.lon = meta.lon;
-                n.title = meta.name + " (" + ip + ":" + port + ")";
-                combined.add(n);
-            }
-        } catch (Exception ignored) {}
-
-        // 2. Monosans HTTP/HTTPS Proxies with RTT + GeoIP
+        // 1. Monosans live-checked HTTP CONNECT / HTTPS Proxies (Android 10+ VpnService.Builder.setHttpProxy compatible)
         try {
             String raw = httpGetText(MONOSANS_JSON_URL, 7000);
             JSONArray arr = new JSONArray(raw);
@@ -307,7 +265,7 @@ public final class ShihabRelayService {
     public static void probeLiveSingleRttBatch(List<ShihabRelayNode> candidates, int maxNodes, int timeoutMs) {
         if (candidates == null || candidates.isEmpty()) return;
         int limit = Math.min(candidates.size(), Math.max(1, maxNodes));
-        ExecutorService exec = Executors.newFixedThreadPool(Math.min(16, limit));
+        ExecutorService exec = Executors.newFixedThreadPool(Math.min(8, limit));
         try {
             List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(limit);
             for (int i = 0; i < limit; i++) {
@@ -382,14 +340,21 @@ public final class ShihabRelayService {
         int bestPing = Math.max(10, pool.get(0).pingMs);
         int fastBandLimit = Math.max(bestPing + 30, (int) Math.round(bestPing * 1.35));
 
+        ShihabRelayNode chosen = pool.get(0);
         if (dynamicRotation && recentHosts != null && !recentHosts.isEmpty()) {
             for (ShihabRelayNode candidate : pool) {
                 if (candidate.pingMs <= fastBandLimit && !recentHosts.contains(candidate.host)) {
-                    return candidate;
+                    chosen = candidate;
+                    break;
                 }
             }
         }
-        return pool.get(0);
+        // Re-measure chosen winner on idle network so parallel socket burst never inflates displayed pingMs
+        int calmRtt = measureDirectTcpSingleRttMs(chosen.host, chosen.port > 0 ? chosen.port : 443, 800);
+        if (calmRtt > 0 && calmRtt < chosen.pingMs) {
+            chosen.pingMs = calmRtt;
+        }
+        return chosen;
     }
 
     public static ShihabGeoAudit verifyShihabGeoIp(String expectedCountryCode) {

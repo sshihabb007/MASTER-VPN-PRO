@@ -665,6 +665,83 @@ namespace ShihabShieldVpn.Services
             }
 
             ProbeShihabTcp443Batch(selected, selected.Count, timeoutMs);
+
+            // Re-sample the #1 reachable node in up to 14 priority countries with zero burst concurrency so Wi-Fi TX queuing never inflates list ping
+            Dictionary<string, ShihabVpnServerNode> bestPerCountry = new Dictionary<string, ShihabVpnServerNode>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < selected.Count; i++)
+            {
+                ShihabVpnServerNode n = selected[i];
+                if (n == null || !n.IsTcp443Reachable) continue;
+                string cc = string.IsNullOrWhiteSpace(n.CountryShort) ? "GL" : n.CountryShort.Trim().ToUpperInvariant();
+                ShihabVpnServerNode cur;
+                if (!bestPerCountry.TryGetValue(cc, out cur) || n.PingMs < cur.PingMs)
+                {
+                    bestPerCountry[cc] = n;
+                }
+            }
+
+            List<ShihabVpnServerNode> calmTargets = new List<ShihabVpnServerNode>();
+            foreach (ShihabVpnServerNode best in bestPerCountry.Values)
+            {
+                calmTargets.Add(best);
+            }
+            calmTargets.Sort(delegate(ShihabVpnServerNode a, ShihabVpnServerNode b) { return a.PingMs.CompareTo(b.PingMs); });
+
+            int calmCount = Math.Min(14, calmTargets.Count);
+            using (SemaphoreSlim calmGate = new SemaphoreSlim(2))
+            {
+                List<Task> calmTasks = new List<Task>(calmCount);
+                for (int i = 0; i < calmCount; i++)
+                {
+                    ShihabVpnServerNode target = calmTargets[i];
+                    calmTasks.Add(Task.Run(delegate
+                    {
+                        calmGate.Wait();
+                        try
+                        {
+                            int cleanRtt = MeasureCleanIdleGatewayRttMs(target, 700);
+                            if (cleanRtt > 0 && cleanRtt < target.PingMs)
+                            {
+                                target.PingMs = cleanRtt;
+                            }
+                        }
+                        finally
+                        {
+                            calmGate.Release();
+                        }
+                    }));
+                }
+                Task.WaitAll(calmTasks.ToArray(), 2200);
+            }
+        }
+
+        public static int MeasureCleanIdleGatewayRttMs(ShihabVpnServerNode node, int timeoutMs)
+        {
+            if (node == null) return -1;
+            int port = node.Port > 0 ? node.Port : 443;
+            IPAddress ipAddr;
+            if (!TryResolveEndpointIpOutsideTimer(node.IpAddress, node.BareSstpHost, out ipAddr) || ipAddr == null)
+            {
+                return -1;
+            }
+
+            int bestMs = int.MaxValue;
+            int icmpMs = MeasureIcmpEchoRttMs(ipAddr, Math.Min(650, timeoutMs));
+            if (icmpMs > 0 && icmpMs < bestMs)
+            {
+                bestMs = icmpMs;
+            }
+
+            for (int s = 0; s < 2; s++)
+            {
+                int tcpMs;
+                if (ProbeDirectIpTcpPort(ipAddr, port, timeoutMs, out tcpMs) && tcpMs > 0 && tcpMs < bestMs)
+                {
+                    bestMs = tcpMs;
+                }
+            }
+
+            return bestMs < int.MaxValue ? bestMs : -1;
         }
 
         public static void ProbeShihabTcp443Batch(List<ShihabVpnServerNode> nodes, int maxCount, int timeoutMs)
@@ -675,7 +752,7 @@ namespace ShihabShieldVpn.Services
             }
 
             int count = Math.Min(nodes.Count, Math.Max(1, maxCount));
-            using (SemaphoreSlim gate = new SemaphoreSlim(28))
+            using (SemaphoreSlim gate = new SemaphoreSlim(10))
             {
                 List<Task> tasks = new List<Task>(count);
                 for (int i = 0; i < count; i++)

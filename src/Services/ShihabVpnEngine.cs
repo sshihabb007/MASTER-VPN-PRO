@@ -804,7 +804,7 @@ namespace ShihabShieldVpn.Services
             List<ShihabVpnServerNode> verifiedWinners = new List<ShihabVpnServerNode>();
             List<ShihabVpnServerNode> unverifiedFallbacks = new List<ShihabVpnServerNode>();
 
-            using (SemaphoreSlim gate = new SemaphoreSlim(14))
+            using (SemaphoreSlim gate = new SemaphoreSlim(8))
             {
                 List<Task> tasks = new List<Task>(probeCap);
                 for (int i = 0; i < probeCap; i++)
@@ -833,7 +833,15 @@ namespace ShihabShieldVpn.Services
                                 item.Port = vPort;
                                 if (singleIpRtt > 0)
                                 {
-                                    item.PingMs = singleIpRtt;
+                                    // Preserve an already-measured lower clean idle 1-RTT if parallel TLS burst added Wi-Fi queue delay
+                                    if (item.IsLocallyProbed && item.PingMs > 0)
+                                    {
+                                        item.PingMs = Math.Min(item.PingMs, singleIpRtt);
+                                    }
+                                    else
+                                    {
+                                        item.PingMs = singleIpRtt;
+                                    }
                                 }
                                 item.WasProbed = true;
                                 item.IsLocallyProbed = true;
@@ -882,15 +890,14 @@ namespace ShihabShieldVpn.Services
                     cfg,
                     rotCountry);
 
-                // Cross-check exact kernel ICMP 1-RTT on the #1 winning server so local TCP socket scheduling jitter never inflates PingMs
+                // Measure uncontended idle 1-RTT (ICMP + 2 clean Direct-IP TCP probes) on the #1 winning server now that all race sockets are closed!
                 ShihabVpnServerNode topWinner = rotatedWinners[0];
-                IPAddress winIp;
-                if (topWinner != null && IPAddress.TryParse(topWinner.IpAddress ?? string.Empty, out winIp))
+                if (topWinner != null)
                 {
-                    int icmpMs = ShihabPublicRelayService.MeasureIcmpEchoRttMs(winIp, 550);
-                    if (icmpMs > 0 && (topWinner.PingMs <= 0 || icmpMs < topWinner.PingMs))
+                    int cleanIdleMs = ShihabPublicRelayService.MeasureCleanIdleGatewayRttMs(topWinner, 800);
+                    if (cleanIdleMs > 0 && (topWinner.PingMs <= 0 || cleanIdleMs < topWinner.PingMs))
                     {
-                        topWinner.PingMs = icmpMs;
+                        topWinner.PingMs = cleanIdleMs;
                     }
                 }
 
@@ -1135,11 +1142,9 @@ namespace ShihabShieldVpn.Services
             int primaryPort = node.Port > 0 ? node.Port : 443;
             if (VerifySingleShihabSstpHandshakeWithIp(ipAddr, fqdn, primaryPort, 1650, out rttMs))
             {
-                if (ipAddr != null)
-                {
-                    int icmpMs = ShihabPublicRelayService.MeasureIcmpEchoRttMs(ipAddr, 550);
-                    if (icmpMs > 0 && icmpMs < rttMs) rttMs = icmpMs;
-                }
+                node.Port = primaryPort;
+                int cleanMs = ShihabPublicRelayService.MeasureCleanIdleGatewayRttMs(node, 750);
+                if (cleanMs > 0 && cleanMs < rttMs) rttMs = cleanMs;
                 verifiedPort = primaryPort;
                 return true;
             }
@@ -1161,11 +1166,9 @@ namespace ShihabShieldVpn.Services
 
                 if (VerifySingleShihabSstpHandshakeWithIp(ipAddr, fqdn, fp, 1200, out rttMs))
                 {
-                    if (ipAddr != null)
-                    {
-                        int icmpMs = ShihabPublicRelayService.MeasureIcmpEchoRttMs(ipAddr, 550);
-                        if (icmpMs > 0 && icmpMs < rttMs) rttMs = icmpMs;
-                    }
+                    node.Port = fp;
+                    int cleanMs = ShihabPublicRelayService.MeasureCleanIdleGatewayRttMs(node, 750);
+                    if (cleanMs > 0 && cleanMs < rttMs) rttMs = cleanMs;
                     verifiedPort = fp;
                     return true;
                 }

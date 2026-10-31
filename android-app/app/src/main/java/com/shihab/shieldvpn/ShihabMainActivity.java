@@ -736,7 +736,7 @@ public class ShihabMainActivity extends Activity {
 
         LinearLayout card = makeBentoCard();
         TextView t1 = new TextView(this);
-        t1.setText("MASTER VPN PRO — Android Edition v1.3.0");
+        t1.setText("MASTER VPN PRO — Android Edition v1.3.1");
         t1.setTextColor(Color.WHITE);
         t1.setTypeface(Typeface.DEFAULT_BOLD);
         t1.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.5f);

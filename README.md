@@ -27,17 +27,17 @@
 
 ---
 
-## ⚡ Official Downloads (`v1.3.0`)
+## ⚡ Official Downloads (`v1.3.1`)
 
 Grab the pre-built, SHA-256 checksummed packages directly from the [**GitHub Releases**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest) page:
 
 | Platform | Edition | Package | Highlights |
 | :--- | :--- | :--- | :--- |
-| **🖥 Windows 10 / 11** | **Setup Wizard** | [**`MASTER-VPN-PRO-Setup-1.3.0.exe`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Setup-1.3.0.exe) | Graphical Dark Setup Wizard, Desktop & Start Menu shortcuts, optional System Tray auto-start, and clean `Uninstall.exe`. |
-| **🖥 Windows 10 / 11** | **Portable `.exe`** | [**`MASTER-VPN-PRO-Portable-1.3.0.exe`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Portable-1.3.0.exe) | Single-file (`~310 KB`), zero-install `AnyCPU` (`x64`/`ARM64`/`x86`) executable with Parallel Direct-IP 1-RTT Gateway Race & isolated `.pbk` phonebook. |
-| **🌐 Chrome & Brave** | **Unpacked `.zip`** | [**`MASTER-VPN-PRO-Browser-Extension-1.3.0.zip`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Browser-Extension-1.3.0.zip) | Manifest V3 extension supporting zero-preflight Desktop MS-SSTP Tunnel Sync & Fail-Closed Multi-Proxy PAC + WebRTC leak shield. |
-| **🌐 Chrome & Brave** | **Signed `.crx3`** | [**`MASTER-VPN-PRO-Browser-Extension-1.3.0.crx`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Browser-Extension-1.3.0.crx) | Signed Chromium extension archive for offline archiving and enterprise policy deployment. |
-| **📱 Android (`8.0–14+`)** | **Signed `.apk`** | [**`MASTER-VPN-PRO-Android-1.3.0.apk`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Android-1.3.0.apk) | `v1 + v2 + v3` signed Android smartphone app (`com.shihab.shieldvpn`) with 16-thread Direct-IP 1-RTT probing, `VpnService` & 3D Fibonacci Globe. |
+| **🖥 Windows 10 / 11** | **Setup Wizard** | [**`MASTER-VPN-PRO-Setup-1.3.1.exe`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Setup-1.3.1.exe) | Graphical Dark Setup Wizard, Desktop & Start Menu shortcuts, optional System Tray auto-start, and clean `Uninstall.exe`. |
+| **🖥 Windows 10 / 11** | **Portable `.exe`** | [**`MASTER-VPN-PRO-Portable-1.3.1.exe`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Portable-1.3.1.exe) | Single-file (`~310 KB`), zero-install `AnyCPU` (`x64`/`ARM64`/`x86`) executable with Parallel Direct-IP 1-RTT Gateway Race & isolated `.pbk` phonebook. |
+| **🌐 Chrome & Brave** | **Unpacked `.zip`** | [**`MASTER-VPN-PRO-Browser-Extension-1.3.1.zip`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Browser-Extension-1.3.1.zip) | Manifest V3 extension supporting zero-preflight Desktop MS-SSTP Tunnel Sync & Fail-Closed Multi-Proxy PAC + WebRTC leak shield. |
+| **🌐 Chrome & Brave** | **Signed `.crx3`** | [**`MASTER-VPN-PRO-Browser-Extension-1.3.1.crx`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Browser-Extension-1.3.1.crx) | Signed Chromium extension archive for offline archiving and enterprise policy deployment. |
+| **📱 Android (`8.0–14+`)** | **Signed `.apk`** | [**`MASTER-VPN-PRO-Android-1.3.1.apk`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Android-1.3.1.apk) | `v1 + v2 + v3` signed Android smartphone app (`com.shihab.shieldvpn`) with 16-thread Direct-IP 1-RTT probing, `VpnService` & 3D Fibonacci Globe. |
 | **🔐 Integrity** | **SHA-256 Sums** | [**`SHA256SUMS.txt`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/SHA256SUMS.txt) | Cryptographic SHA-256 digests generated automatically by GitHub Actions CI. |
 
 ---
@@ -139,12 +139,12 @@ flowchart LR
 
 ### 🖥 1. Windows Desktop Edition (Setup & Portable)
 
-- **Option A — Setup Installer (`MASTER-VPN-PRO-Setup-1.3.0.exe`):**
-  1. Download and launch `MASTER-VPN-PRO-Setup-1.3.0.exe`.
+- **Option A — Setup Installer (`MASTER-VPN-PRO-Setup-1.3.1.exe`):**
+  1. Download and launch `MASTER-VPN-PRO-Setup-1.3.1.exe`.
   2. Review the planned installation directory (`%LOCALAPPDATA%\Programs\MASTER VPN PRO`) and optional shortcuts, then click **Install**.
   3. Uninstall anytime from **Windows Settings → Installed Apps → MASTER VPN PRO** (or `Uninstall.exe`).
-- **Option B — Zero-Install Portable (`MASTER-VPN-PRO-Portable-1.3.0.exe`):**
-  1. Place `MASTER-VPN-PRO-Portable-1.3.0.exe` in any folder or USB drive and run it directly—no `.NET SDK`, OpenVPN TAP driver, or WinTUN installation required.
+- **Option B — Zero-Install Portable (`MASTER-VPN-PRO-Portable-1.3.1.exe`):**
+  1. Place `MASTER-VPN-PRO-Portable-1.3.1.exe` in any folder or USB drive and run it directly—no `.NET SDK`, OpenVPN TAP driver, or WinTUN installation required.
 - **Command-Line Automation Flags:**
   ```powershell
   .\MasterVpnPro.exe --status                # Inspect current tunnel & GeoIP status
@@ -158,7 +158,7 @@ flowchart LR
 
 ### 🌐 2. Chrome & Brave Browser Extension (`Manifest V3`)
 
-1. Download and extract [**`MASTER-VPN-PRO-Browser-Extension-1.3.0.zip`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Browser-Extension-1.3.0.zip) (or use the [`browser-extension/`](browser-extension/) folder from this repository).
+1. Download and extract [**`MASTER-VPN-PRO-Browser-Extension-1.3.1.zip`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Browser-Extension-1.3.1.zip) (or use the [`browser-extension/`](browser-extension/) folder from this repository).
 2. Open **`chrome://extensions`** in Google Chrome or **`brave://extensions`** in Brave Browser.
 3. Toggle **Developer mode** ON in the top-right corner.
 4. Click **Load unpacked** and select the extracted `browser-extension` directory.
@@ -170,7 +170,7 @@ flowchart LR
 
 ### 📱 3. Android Smartphone Application (`.apk`)
 
-1. Download [**`MASTER-VPN-PRO-Android-1.3.0.apk`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Android-1.3.0.apk) on your Android phone (`Android 8.0 Oreo / API 26` through `Android 14+ / API 34`).
+1. Download [**`MASTER-VPN-PRO-Android-1.3.1.apk`**](https://github.com/sshihabb007/MASTER-VPN-PRO/releases/latest/download/MASTER-VPN-PRO-Android-1.3.1.apk) on your Android phone (`Android 8.0 Oreo / API 26` through `Android 14+ / API 34`).
 2. Tap the `.apk` to install **MASTER VPN PRO**.
 3. Open the app, pick any of the **70+ countries** (or add your own Private Proxy / Android 11+ `IKEv2` PSK server in the **Servers** tab), and tap **CONNECT**.
 4. Approve the standard Android `VpnService` connection dialog on first connect.

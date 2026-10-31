@@ -13,8 +13,8 @@ using Microsoft.Win32;
 [assembly: AssemblyCompany("Mehedi Hasan Shihab")]
 [assembly: AssemblyProduct("MASTER VPN PRO")]
 [assembly: AssemblyCopyright("Copyright © 2026 Mehedi Hasan Shihab (sshihabb007)")]
-[assembly: AssemblyVersion("1.3.0.0")]
-[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyVersion("1.3.1.0")]
+[assembly: AssemblyFileVersion("1.3.1.0")]
 [assembly: ComVisible(false)]
 
 namespace ShihabShieldVpnInstaller
@@ -22,7 +22,7 @@ namespace ShihabShieldVpnInstaller
     public static class SetupProgram
     {
         public const string ProductName = "MASTER VPN PRO";
-        public const string ProductVersion = "1.3.0";
+        public const string ProductVersion = "1.3.1";
         public const string PublisherName = "Mehedi Hasan Shihab";
         public const string MainExeName = "MasterVpnPro.exe";
         public const string UninstallKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\MasterVpnPro";
@@ -283,7 +283,7 @@ namespace ShihabShieldVpnInstaller
         public ShihabSetupForm(string initialDir, bool uninstallMode)
         {
             _isUninstall = uninstallMode;
-            Text = uninstallMode ? "Uninstall MASTER VPN PRO" : "MASTER VPN PRO v1.3.0 — Setup Wizard";
+            Text = uninstallMode ? "Uninstall MASTER VPN PRO" : "MASTER VPN PRO v1.3.1 — Setup Wizard";
             ClientSize = new Size(540, 390);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -296,7 +296,7 @@ namespace ShihabShieldVpnInstaller
 
             Label header = new Label
             {
-                Text = uninstallMode ? "Remove MASTER VPN PRO" : "Install MASTER VPN PRO v1.3.0",
+                Text = uninstallMode ? "Remove MASTER VPN PRO" : "Install MASTER VPN PRO v1.3.1",
                 Font = new Font("Segoe UI", 15f, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(24, 20),

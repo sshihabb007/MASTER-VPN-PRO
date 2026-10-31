@@ -228,7 +228,7 @@ namespace ShihabShieldVpn.Services
                         ? _callbacks.GetStatusSnapshot()
                         : new Dictionary<string, object>();
                     payload["ok"] = true;
-                    payload["bridgeVersion"] = "1.3.0";
+                    payload["bridgeVersion"] = "1.3.1";
                     WriteJsonResponse(ns, 200, "OK", allowedCorsOrigin, ser.Serialize(payload));
                     return;
                 }

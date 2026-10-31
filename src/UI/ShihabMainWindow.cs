@@ -208,7 +208,7 @@ namespace ShihabShieldVpn.UI
                 AppendShihabEngineLog(
                     "SYSTEM",
                     string.Format(
-                        "MASTER VPN PRO v1.3.0 initialized • Dynamic IP Rotation={0} • Extended Pool={1}",
+                        "MASTER VPN PRO v1.3.1 initialized • Dynamic IP Rotation={0} • Extended Pool={1}",
                         _shihabConfig.DynamicIpRotation ? "ACTIVE" : "STICKY",
                         _shihabConfig.ShowExtendedCatalog ? "ON" : "COMPACT"));
             }
@@ -2063,7 +2063,7 @@ namespace ShihabShieldVpn.UI
             StackPanel nameStack = new StackPanel();
             nameStack.Children.Add(new TextBlock
             {
-                Text = "MASTER VPN PRO — Open-Source Edition v1.3.0",
+                Text = "MASTER VPN PRO — Open-Source Edition v1.3.1",
                 FontSize = 17.5,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White
@@ -2102,7 +2102,7 @@ namespace ShihabShieldVpn.UI
 
             st.Children.Add(new TextBlock
             {
-                Text = "Focused on building fast, clean, user-centric desktop tools and full-stack web applications. MASTER VPN PRO v1.3.0 unifies a parallel Direct-IP 1-RTT lowest-latency gateway engine, an extended 70+ country open relay catalog, interactive 3D Fibonacci Globe & Shield route visualization, Dynamic IP Rotation, live GeoIP/ISP/ASN & IP-leak auditing, 1-click .ovpn profile export, Chrome/Brave Browser Companion Sync, and private MS-SSTP, IKEv2, L2TP/IPsec, PPTP, WireGuard (.conf), OpenVPN (.ovpn), and DPAPI-secured HTTP/HTTPS System Proxy support.",
+                Text = "Focused on building fast, clean, user-centric desktop tools and full-stack web applications. MASTER VPN PRO v1.3.1 unifies a parallel Direct-IP 1-RTT lowest-latency gateway engine, an extended 70+ country open relay catalog, interactive 3D Fibonacci Globe & Shield route visualization, Dynamic IP Rotation, live GeoIP/ISP/ASN & IP-leak auditing, 1-click .ovpn profile export, Chrome/Brave Browser Companion Sync, and private MS-SSTP, IKEv2, L2TP/IPsec, PPTP, WireGuard (.conf), OpenVPN (.ovpn), and DPAPI-secured HTTP/HTTPS System Proxy support.",
                 FontSize = 12.2,
                 Foreground = BrushHex("#C4CCD8"),
                 TextWrapping = TextWrapping.Wrap,

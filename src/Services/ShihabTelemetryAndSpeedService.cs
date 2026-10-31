@@ -588,7 +588,13 @@ namespace ShihabShieldVpn.Services
                     pingPort = 443;
                 }
 
-                List<int> samples = new List<int>(3);
+                List<int> samples = new List<int>(4);
+                IPAddress directIp;
+                if (IPAddress.TryParse(pingTarget, out directIp))
+                {
+                    int icmp = ShihabPublicRelayService.MeasureIcmpEchoRttMs(directIp, 700);
+                    if (icmp > 0) samples.Add(icmp);
+                }
                 for (int i = 0; i < 3; i++)
                 {
                     int ms;

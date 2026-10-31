@@ -85,7 +85,7 @@
           lon: 90.41
         },
         logs: [
-          { ts: "12:18:00", cat: "SYSTEM", msg: "MASTER VPN PRO Extension v1.3.0 ready (Chrome / Brave MV3)." }
+          { ts: "12:18:00", cat: "SYSTEM", msg: "MASTER VPN PRO Extension v1.3.1 ready (Chrome / Brave MV3)." }
         ]
       },
       desktopBridge,
@@ -179,7 +179,7 @@
       g.totalServers++;
       if ((p.pingMs || 999) < g.bestPingMs) g.bestPingMs = p.pingMs;
     }
-    return Array.from(byCc.values()).sort((a, b) => b.totalServers - a.totalServers);
+    return Array.from(byCc.values()).sort((a, b) => (a.bestPingMs - b.bestPingMs) || (b.totalServers - a.totalServers));
   }
 
   function renderDashboard() {

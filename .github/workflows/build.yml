@@ -84,21 +84,21 @@ jobs:
       - name: Compile Windows Portable & Setup Installer via build.ps1
         shell: pwsh
         run: |
-          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.0' }
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.1' }
           $VerClean = $TagVer.TrimStart('v')
           powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -SkipDesktopCopy -SkipExternalNetworkProbes -Version $VerClean
 
       - name: Package Chrome & Brave Browser Extension via build-extension.ps1
         shell: pwsh
         run: |
-          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.0' }
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.1' }
           $VerClean = $TagVer.TrimStart('v')
           powershell -NoProfile -ExecutionPolicy Bypass -File .\build-extension.ps1 -Version $VerClean
 
       - name: Compile & Sign Android Smartphone APK via build-apk.ps1
         shell: pwsh
         run: |
-          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.0' }
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.1' }
           $VerClean = $TagVer.TrimStart('v')
           powershell -NoProfile -ExecutionPolicy Bypass -File .\android-app\build-apk.ps1 -Version $VerClean
 
@@ -107,7 +107,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path "release-dist" | Out-Null
 
-          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.0' }
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.3.1' }
           $VerClean = $TagVer.TrimStart('v')
 
           $PortableName = "MASTER-VPN-PRO-Portable-$VerClean.exe"

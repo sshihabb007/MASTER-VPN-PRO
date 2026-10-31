@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "MASTER VPN PRO",
   "short_name": "MASTER VPN PRO",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "MASTER VPN PRO — Open-Source Browser VPN & Proxy Shield for Chrome & Brave: 70+ Country Desktop Tunnel Sync, Standalone Proxy PAC, Split-Tunneling, 3D Globe & Leak Audit by Mehedi Hasan Shihab.",
   "author": "Mehedi Hasan Shihab (sshihabb007)",
   "permissions": [
