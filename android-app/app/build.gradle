@@ -1,0 +1,35 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.shihab.shieldvpn'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.shihab.shieldvpn"
+        minSdk 26
+        targetSdk 34
+        versionCode 120
+        versionName "1.2.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+        debug {
+            applicationIdSuffix ""
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    // Pure Android SDK (zero external Maven dependencies required; compiles offline via Gradle or build-apk.ps1)
+}
+

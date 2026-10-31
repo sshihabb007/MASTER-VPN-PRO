@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Shihab Shield VPN</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="shihab-app">
+    <!-- Left Icon Rail -->
+    <aside class="shihab-rail">
+      <img src="icons/icon48.png" alt="Shihab Shield" class="rail-brand" />
+
+      <button class="rail-btn active" data-tab="0" title="Dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5z"/>
+        </svg>
+      </button>
+
+      <button class="rail-btn" data-tab="1" title="Public & Private Servers">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>
+        </svg>
+      </button>
+
+      <button class="rail-btn" data-tab="2" title="Speed, GeoIP Leak Audit & Logs">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 14l4-4M3.34 19a10 10 0 1 1 17.32 0"/>
+        </svg>
+      </button>
+
+      <button class="rail-btn" data-tab="3" title="Shield & Split-Tunnel Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </button>
+
+      <button class="rail-btn" data-tab="4" title="About Developer (Mehedi Hasan Shihab)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 16v-4M12 8h.01"/>
+        </svg>
+      </button>
+    </aside>
+
+    <!-- Main Panel -->
+    <main class="shihab-main">
+      <header class="shihab-topbar">
+        <div id="topStatusPill" class="status-pill">● Disconnected</div>
+        <div class="brand-title">Shihab Shield <span>Open Pro</span></div>
+        <button id="btnTopRefresh" class="icon-action-btn" title="Refresh Public Relays & Desktop Bridge">↻</button>
+      </header>
+
+      <!-- TAB 0: DASHBOARD -->
+      <section class="tab-view active" id="tabView0">
+        <div class="bento-card">
+          <div class="card-hdr">
+            <span class="card-title" id="engineBadgeLabel">Virtual location • Auto Bridge</span>
+            <div class="cam-pills">
+              <button class="mini-pill active" data-cam="3D">3D</button>
+              <button class="mini-pill" data-cam="Shield">Shield</button>
+              <button class="mini-pill" data-cam="Orbit">Orbit</button>
+              <button class="mini-pill" data-cam="2D">2D</button>
+            </div>
+          </div>
+
+          <div class="loc-selector" id="locSelectorRow">
+            <div class="cc-badge" id="dashCcBadge">US</div>
+            <div class="loc-texts">
+              <div class="loc-main" id="dashLocTitle">Auto — Fastest Gateway</div>
+              <div class="loc-sub" id="dashLocSub">Syncing multi-country relay catalog...</div>
+            </div>
+            <span style="color:#8E96A4;font-size:16px;">›</span>
+          </div>
+
+          <canvas id="shihabGlobeCanvas"></canvas>
+        </div>
+
+        <div class="bento-card">
+          <div class="card-hdr">
+            <span class="card-title">Server Information</span>
+            <div style="display:flex;gap:5px;align-items:center;">
+              <button id="btnRotateIp" class="mini-pill" style="color:#7DD3FC;border-color:#2C3B50;">↻ Rotate IP</button>
+              <span id="dashProtoPill" class="ping-tag">MS-SSTP / PAC</span>
+            </div>
+          </div>
+          <div class="metric-grid">
+            <div class="metric-row"><span class="metric-lbl">Egress IP</span><span class="metric-val" id="dashIpVal">—</span></div>
+            <div class="metric-row"><span class="metric-lbl">Latency</span><span class="metric-val" id="dashPingVal">24 ms</span></div>
+            <div class="metric-row"><span class="metric-lbl">Peak Speed</span><span class="metric-val" id="dashSpeedVal">0.0 Mbps</span></div>
+            <div class="metric-row"><span class="metric-lbl">Connected</span><span class="metric-val" id="dashTimerVal">00:00</span></div>
+          </div>
+        </div>
+
+        <div class="bento-card site-split-bar">
+          <div class="site-domain" id="activeTabDomainLabel">Current site: browser tab</div>
+          <button id="btnBypassCurrentSite" class="mini-pill">Direct Bypass: OFF</button>
+        </div>
+      </section>
+
+      <!-- TAB 1: PUBLIC & PRIVATE SERVERS -->
+      <section class="tab-view" id="tabView1">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:13px;font-weight:700;">Global Locations & Proxies</div>
+            <div id="srvCountSub" style="font-size:10px;color:#8A93A2;">Loading relays...</div>
+          </div>
+          <button id="btnToggleAddPrivate" class="action-btn">+ Private Proxy</button>
+        </div>
+
+        <input id="srvSearchInput" class="search-input" placeholder="Search country (United States, UK, Japan...), city, or IP..." />
+
+        <div class="pill-row">
+          <button class="mini-pill active" data-srvmode="countries">Countries</button>
+          <button class="mini-pill" data-srvmode="proxies">Open Proxies</button>
+          <button class="mini-pill" data-srvmode="ovpn">.ovpn Export</button>
+          <button class="mini-pill" data-srvmode="private">Private</button>
+        </div>
+
+        <div class="pill-row">
+          <button class="mini-pill active" data-reg="ALL">All Regions</button>
+          <button class="mini-pill" data-reg="Americas">Americas</button>
+          <button class="mini-pill" data-reg="EMEA">EMEA</button>
+          <button class="mini-pill" data-reg="Asia & Oceania">Asia & Oceania</button>
+        </div>
+
+        <div id="privCreatorDrawer" class="bento-card" style="display:none;border-color:#1DA1F2;">
+          <div style="font-size:11.5px;font-weight:700;margin-bottom:6px;">Add Private Proxy (HTTP / HTTPS / SOCKS5)</div>
+          <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:5px;margin-bottom:5px;">
+            <input id="privTitleIn" class="dark-input" placeholder="Label (e.g. US Private)" />
+            <select id="privSchemeIn" class="dark-select">
+              <option value="HTTP">HTTP Proxy</option>
+              <option value="HTTPS">HTTPS (TLS)</option>
+              <option value="SOCKS5">SOCKS5</option>
+              <option value="SOCKS4">SOCKS4</option>
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:1.4fr 0.6fr;gap:5px;margin-bottom:5px;">
+            <input id="privHostIn" class="dark-input" placeholder="proxy.example.com" />
+            <input id="privPortIn" class="dark-input" placeholder="8080" value="8080" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:5px;">
+            <input id="privUserIn" class="dark-input" placeholder="Username (opt)" />
+            <input id="privPassIn" type="password" class="dark-input" placeholder="Password (opt)" />
+            <button id="btnSavePrivateProxy" class="action-btn emerald">Save</button>
+          </div>
+        </div>
+
+        <div id="serverRowsHost" class="server-list"></div>
+      </section>
+
+      <!-- TAB 2: SPEED, GEOIP LEAK AUDIT & LOGS -->
+      <section class="tab-view" id="tabView2">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;font-weight:700;">GeoIP Audit & Engine Logs</div>
+          <div class="pill-row">
+            <button id="btnDiagSubAudit" class="mini-pill active">Live IP Audit</button>
+            <button id="btnDiagSubLogs" class="mini-pill">Activity Logs</button>
+          </div>
+        </div>
+
+        <div id="diagAuditPane" style="display:flex;flex-direction:column;gap:8px;">
+          <div class="stat-grid-2">
+            <div class="bento-card">
+              <div class="card-title">Download Speed</div>
+              <div class="big-stat" id="diagMbpsVal">0.0 Mbps</div>
+              <div class="sub-stat">Cloudflare Edge CDN</div>
+            </div>
+            <div class="bento-card">
+              <div class="card-title">Latency / Jitter</div>
+              <div class="big-stat" id="diagPingJitterVal">24 / 2 ms</div>
+              <div class="sub-stat">HTTPS RTT</div>
+            </div>
+          </div>
+
+          <div class="bento-card">
+            <div class="card-hdr">
+              <span class="card-title">Observed Egress IPv4 & Leak Shield</span>
+              <span id="diagLeakPill" class="ping-tag">AUDITING</span>
+            </div>
+            <div class="big-stat" id="diagIpVal" style="margin-bottom:6px;">Detecting...</div>
+            <div class="metric-row" style="margin-bottom:3px;"><span class="metric-lbl">Route</span><span class="metric-val" id="diagRouteVal">—</span></div>
+            <div class="metric-row" style="margin-bottom:3px;"><span class="metric-lbl">ISP / ASN</span><span class="metric-val" id="diagIspVal" style="color:#7DD3FC;">—</span></div>
+            <div class="metric-row"><span class="metric-lbl">Region Clock</span><span class="metric-val" id="diagClockVal">—</span></div>
+            <div style="display:flex;gap:6px;margin-top:9px;">
+              <button id="btnRunSpeedProbe" class="action-btn">Run Speed Test</button>
+              <button id="btnVerifyGeoNow" class="action-btn secondary">Verify IP Now</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="diagLogsPane" style="display:none;flex-direction:column;gap:6px;flex:1;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="pill-row" id="logCatRow">
+              <button class="mini-pill active" data-logcat="ALL">ALL</button>
+              <button class="mini-pill" data-logcat="TUNNEL">TUNNEL</button>
+              <button class="mini-pill" data-logcat="PROXY">PROXY</button>
+              <button class="mini-pill" data-logcat="VERIFY">VERIFY</button>
+              <button class="mini-pill" data-logcat="SYSTEM">SYSTEM</button>
+            </div>
+            <button id="btnClearLogs" class="mini-pill">Clear</button>
+          </div>
+          <div id="logsContainer" class="log-box"></div>
+        </div>
+      </section>
+
+      <!-- TAB 3: SHIELD SETTINGS -->
+      <section class="tab-view" id="tabView3">
+        <div style="font-size:13px;font-weight:700;">Shield & Split-Tunnel Settings</div>
+
+        <div class="bento-card">
+          <div class="card-title" style="margin-bottom:5px;">Connection Engine Mode</div>
+          <select id="selEnginePref" class="dark-select">
+            <option value="auto">Auto (Desktop MS-SSTP Bridge → Browser Proxy)</option>
+            <option value="desktop">Desktop ShihabShieldVPN.exe Tunnel Only</option>
+            <option value="browser_proxy">Standalone Browser PAC Proxy Only</option>
+          </select>
+
+          <label class="chk-row">
+            <input type="checkbox" id="chkDynRot" checked />
+            <span>Dynamic IP Rotation — Cycle to fresh gateway IP on reconnect</span>
+          </label>
+          <label class="chk-row">
+            <input type="checkbox" id="chkWebRtc" checked />
+            <span>WebRTC IP Leak Shield (disable_non_proxied_udp)</span>
+          </label>
+          <label class="chk-row">
+            <input type="checkbox" id="chkRestoreStartup" checked />
+            <span>Auto-Cutoff & Restore Direct Network on Browser Restart</span>
+          </label>
+        </div>
+
+        <div class="bento-card">
+          <div class="card-title" style="margin-bottom:5px;">Per-Domain Split-Tunneling Bypass (Direct ISP)</div>
+          <input id="txtBypassDomains" class="dark-input" placeholder="localhost, 127.0.0.1, *.local, example.com" />
+          <div style="font-size:10px;color:#8A93A2;margin-top:5px;">
+            Domains listed above always bypass the browser proxy and connect directly.
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: ABOUT DEVELOPER -->
+      <section class="tab-view" id="tabView4">
+        <div class="bento-card" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="font-size:14px;font-weight:800;color:#FFFFFF;">Shihab Shield VPN — Browser Edition v1.2.0</div>
+          <div style="font-size:11.5px;font-weight:600;color:#38BDF8;">Developed & Engineered by Mehedi Hasan Shihab</div>
+          <p style="font-size:11px;color:#C6CFDC;line-height:1.45;">
+            Open-source Chrome & Brave Manifest V3 companion and standalone proxy shield featuring 70+ country Desktop MS-SSTP bridge sync, PAC domain split-tunneling, WebRTC leak protection, 3D Fibonacci Globe, and 1-click .ovpn profile export.
+          </p>
+          <div style="background:#161920;border:1px solid #262B35;border-radius:7px;padding:8px 10px;display:flex;flex-direction:column;gap:5px;font-size:11.2px;">
+            <div><strong style="color:#8E96A4;">Developer:</strong> Mehedi Hasan Shihab</div>
+            <div><strong style="color:#8E96A4;">Portfolio:</strong> <a class="about-link" href="https://sshihabb007.github.io/" target="_blank">sshihabb007.github.io</a></div>
+            <div><strong style="color:#8E96A4;">GitHub:</strong> <a class="about-link" href="https://github.com/sshihabb007" target="_blank">github.com/sshihabb007</a></div>
+            <div><strong style="color:#8E96A4;">LinkedIn:</strong> <a class="about-link" href="https://www.linkedin.com/in/mehedi-hasan-shihab" target="_blank">linkedin.com/in/mehedi-hasan-shihab</a></div>
+            <div><strong style="color:#8E96A4;">Email:</strong> <a class="about-link" href="mailto:sshihabb007@gmail.com">sshihabb007@gmail.com</a></div>
+          </div>
+          <div style="font-size:10px;color:#7A8494;">Copyright © 2026 Mehedi Hasan Shihab • MIT License</div>
+        </div>
+      </section>
+
+      <!-- Bottom Connect Orb Dock -->
+      <footer class="connect-dock">
+        <div class="banner-status" id="bottomStatusText">Ready • Select any country or click power orb</div>
+        <button id="heroConnectBtn" class="power-orb" title="Connect / Disconnect Shihab Shield">
+          <svg id="orbPowerSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+            <path d="M12 3v8M7.05 5.6a7.5 7.5 0 1 0 9.9 0"/>
+          </svg>
+        </button>
+      </footer>
+    </main>
+  </div>
+
+  <script src="shihab_countries.js"></script>
+  <script src="shihab_globe.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
+

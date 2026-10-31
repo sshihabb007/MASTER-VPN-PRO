@@ -1,0 +1,174 @@
+name: Build & Release Shihab Shield VPN (All Platforms)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-multiplatform-releases:
+    name: Build Windows EXE, Browser Extension & Android APK
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3 for multi-size icon generation
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Java 17 (Temurin) for Android SDK & APK Signing
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android SDK (API 34 + Build-Tools 34.0.0)
+        uses: android-actions/setup-android@v3
+
+      - name: Ensure Android Platform 34 & Build-Tools 34.0.0 Installed
+        shell: pwsh
+        run: |
+          $SdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { $env:ANDROID_SDK_ROOT }
+          if (-not (Test-Path (Join-Path $SdkRoot "platforms\android-34\android.jar")) -or
+              -not (Test-Path (Join-Path $SdkRoot "build-tools\34.0.0\aapt2.exe"))) {
+            "y`ny`ny`ny`ny`n" | sdkmanager "platforms;android-34" "build-tools;34.0.0"
+          }
+
+      - name: Compile Windows Portable & Setup Installer via build.ps1
+        shell: pwsh
+        run: |
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.2.0' }
+          $VerClean = $TagVer.TrimStart('v')
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -SkipDesktopCopy -SkipExternalNetworkProbes -Version $VerClean
+
+      - name: Package Chrome & Brave Browser Extension via build-extension.ps1
+        shell: pwsh
+        run: |
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.2.0' }
+          $VerClean = $TagVer.TrimStart('v')
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\build-extension.ps1 -Version $VerClean
+
+      - name: Compile & Sign Android Smartphone APK via build-apk.ps1
+        shell: pwsh
+        run: |
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.2.0' }
+          $VerClean = $TagVer.TrimStart('v')
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\android-app\build-apk.ps1 -Version $VerClean
+
+      - name: Stage Windows, Chrome/Brave & Android Artifacts + Release Notes
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "release-dist" | Out-Null
+
+          $TagVer = if ($env:GITHUB_REF_NAME -like 'v*') { $env:GITHUB_REF_NAME } else { 'v1.2.0' }
+          $VerClean = $TagVer.TrimStart('v')
+
+          $PortableName = "Shihab-Shield-VPN-Portable-$VerClean.exe"
+          $SetupName    = "Shihab-Shield-VPN-Setup-$VerClean.exe"
+          $ExtZipName   = "Shihab-Shield-VPN-Browser-Extension-$VerClean.zip"
+          $ExtCrxName   = "Shihab-Shield-VPN-Browser-Extension-$VerClean.crx"
+          $ApkName      = "Shihab-Shield-VPN-Android-$VerClean.apk"
+
+          foreach ($req in @($PortableName, $SetupName, $ExtZipName, $ApkName)) {
+            $src = Join-Path $PWD "dist\$req"
+            if (-not (Test-Path -LiteralPath $src)) {
+              throw "Expected build artifact missing: $src"
+            }
+            Copy-Item -LiteralPath $src -Destination (Join-Path $PWD "release-dist\$req") -Force
+          }
+
+          $optCrx = Join-Path $PWD "dist\$ExtCrxName"
+          if (Test-Path -LiteralPath $optCrx) {
+            Copy-Item -LiteralPath $optCrx -Destination (Join-Path $PWD "release-dist\$ExtCrxName") -Force
+          }
+
+          $SumsLines = @()
+          $TableRows = @()
+          Get-ChildItem -Path "release-dist" -File | Sort-Object Name | ForEach-Object {
+            $sha = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $kb  = "{0:N1} KB" -f ($_.Length / 1KB)
+            $SumsLines += "$sha  $($_.Name)"
+            $TableRows += "| ``$($_.Name)`` | $kb | ``$sha`` |"
+          }
+          Set-Content -Path (Join-Path $PWD "release-dist\SHA256SUMS.txt") -Value ($SumsLines -join "`r`n") -Encoding UTF8
+
+          $NotesTemplate = @'
+          ## Shihab Shield VPN {{TAG_VER}} — Windows Desktop, Chrome/Brave Extension & Android APK
+
+          Official open-source multi-platform release engineered by **Mehedi Hasan Shihab**:
+
+          - **Windows Setup Installer (`{{SETUP_NAME}}`)** — Graphical dark Setup Wizard with Desktop & Start Menu shortcuts, optional System Tray startup, and clean `Uninstall.exe`.
+          - **Windows Portable Edition (`{{PORTABLE_NAME}}`)** — Single-file zero-install portable `.exe` (`x64` / `ARM64` / `x86`) with 70+ live MS-SSTP countries, Private Multi-Protocol Servers (`SSTP`, `IKEv2`, `L2TP`, `PPTP`, `HTTP/HTTPS System Proxy`, `WireGuard`, `OpenVPN`), 3D Fibonacci Globe, and Local Browser Companion Bridge.
+          - **Chrome & Brave Browser Extension (`{{EXT_ZIP_NAME}}`)** — Manifest V3 extension supporting both Desktop MS-SSTP Tunnel Sync (`127.0.0.1:38195`) and Standalone Browser PAC Proxy mode, per-domain split-tunneling, WebRTC IP leak shield, and `.ovpn` export. *(Extract ZIP -> `chrome://extensions` or `brave://extensions` -> Enable Developer Mode -> Load unpacked)*.
+          - **Android Smartphone App (`{{APK_NAME}}`)** — Signed Android `.apk` (`minSdk 26`, `targetSdk 34`) powered by `android.net.VpnService`, Tunnel-Scoped Secure DNS (`Cloudflare 1.1.1.1` / `AdGuard AdBlock`), Android 10+ HTTP/HTTPS Proxy Tunneling, Android 11+ `Ikev2VpnProfile` provisioning, Per-App Split-Tunneling, 1-tap `.ovpn` export, and interactive 3D Globe.
+
+          ### Developer
+          - **Mehedi Hasan Shihab** *(Web & Software Developer)*
+          - **Portfolio**: https://sshihabb007.github.io/
+          - **GitHub**: https://github.com/sshihabb007
+          - **LinkedIn**: https://www.linkedin.com/in/mehedi-hasan-shihab
+          - **Email**: sshihabb007@gmail.com
+
+          ### Release Artifacts & SHA-256 Checksums
+          | File | Size | SHA-256 |
+          | :--- | :--- | :--- |
+          '@
+          $HeaderLines = ($NotesTemplate -split "`r?`n") | ForEach-Object { $_ -replace '^\s{10}', '' }
+          $NotesBody = (($HeaderLines + $TableRows) -join "`r`n").
+            Replace('{{TAG_VER}}', $TagVer).
+            Replace('{{SETUP_NAME}}', $SetupName).
+            Replace('{{PORTABLE_NAME}}', $PortableName).
+            Replace('{{EXT_ZIP_NAME}}', $ExtZipName).
+            Replace('{{APK_NAME}}', $ApkName)
+
+          Set-Content -Path (Join-Path $PWD "release-dist\RELEASE_NOTES.md") -Value $NotesBody -Encoding UTF8
+
+      - name: Upload Multiplatform Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shihab-Shield-VPN-All-Platforms
+          path: |
+            release-dist/Shihab-Shield-VPN-Setup-*.exe
+            release-dist/Shihab-Shield-VPN-Portable-*.exe
+            release-dist/Shihab-Shield-VPN-Browser-Extension-*
+            release-dist/Shihab-Shield-VPN-Android-*.apk
+            release-dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Remove Previous Release Entry for Tag (if re-releasing)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "${{ github.ref_name }}" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release delete "${{ github.ref_name }}" --yes
+          }
+          $global:LASTEXITCODE = 0
+
+      - name: Publish GitHub Release on Version Tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Shihab Shield VPN ${{ github.ref_name }} — Windows, Chrome/Brave & Android (Mehedi Hasan Shihab)"
+          body_path: release-dist/RELEASE_NOTES.md
+          make_latest: "true"
+          files: |
+            release-dist/Shihab-Shield-VPN-Setup-*.exe
+            release-dist/Shihab-Shield-VPN-Portable-*.exe
+            release-dist/Shihab-Shield-VPN-Browser-Extension-*
+            release-dist/Shihab-Shield-VPN-Android-*.apk
+            release-dist/SHA256SUMS.txt

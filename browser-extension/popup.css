@@ -1,0 +1,494 @@
+/* Shihab Shield VPN — Dark Bento Browser Extension Stylesheet
+ * Engineered by Mehedi Hasan Shihab (sshihabb007)
+ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  width: 392px;
+  height: 584px;
+  background: #131519;
+  color: #F1F5F9;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  overflow: hidden;
+}
+
+.shihab-app {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  width: 100%;
+  height: 100%;
+}
+
+/* Left Navigation Rail */
+.shihab-rail {
+  background: #171A20;
+  border-right: 1px solid #232832;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.rail-brand {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 14px;
+}
+
+.rail-btn {
+  position: relative;
+  width: 40px;
+  height: 38px;
+  margin-bottom: 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #8A93A4;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.rail-btn:hover {
+  background: #212630;
+  color: #E2E8F0;
+}
+
+.rail-btn.active {
+  background: #1E293B;
+  color: #38BDF8;
+}
+
+.rail-btn.active::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: #38BDF8;
+}
+
+/* Main Content Area */
+.shihab-main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.shihab-topbar {
+  height: 42px;
+  padding: 0 12px;
+  border-bottom: 1px solid #20252F;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.status-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #1E222A;
+  border: 1px solid #2D333E;
+  color: #9BA3B0;
+}
+
+.status-pill.protected {
+  background: #132F28;
+  border-color: #10B981;
+  color: #34D399;
+}
+
+.brand-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.brand-title span {
+  font-weight: 400;
+  color: #8E98A8;
+}
+
+.icon-action-btn {
+  background: #1E232D;
+  border: 1px solid #2B3240;
+  color: #CBD5E1;
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.icon-action-btn:hover {
+  border-color: #38BDF8;
+  color: #FFFFFF;
+}
+
+/* Views */
+.tab-view {
+  display: none;
+  flex: 1;
+  padding: 10px 12px;
+  overflow-y: auto;
+}
+
+.tab-view.active {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bento-card {
+  background: #1D2026;
+  border: 1px solid #282D37;
+  border-radius: 9px;
+  padding: 10px 12px;
+}
+
+.card-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.card-title {
+  font-size: 11.5px;
+  color: #9BA3B2;
+  font-weight: 600;
+}
+
+.cam-pills {
+  display: flex;
+  gap: 3px;
+}
+
+.mini-pill {
+  background: #242A35;
+  border: 1px solid #2F3746;
+  color: #9BA3B0;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mini-pill.active {
+  background: #1E3A5F;
+  border-color: #38BDF8;
+  color: #7DD3FC;
+}
+
+.loc-selector {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.loc-selector:hover {
+  background: #252A34;
+}
+
+.cc-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1DA1F2, #6366F1);
+  color: #FFFFFF;
+  font-size: 10.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.loc-texts {
+  flex: 1;
+  min-width: 0;
+}
+
+.loc-main {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.loc-sub {
+  font-size: 10.6px;
+  color: #8A93A2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#shihabGlobeCanvas {
+  width: 100%;
+  height: 126px;
+  display: block;
+  cursor: grab;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  margin-top: 4px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+}
+
+.metric-lbl {
+  color: #9AA3B2;
+}
+
+.metric-val {
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.site-split-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+}
+
+.site-domain {
+  font-size: 11px;
+  color: #CBD5E1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Hero Connect Footer */
+.connect-dock {
+  padding: 6px 12px 9px;
+  border-top: 1px solid #20252F;
+  background: #15181F;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.banner-status {
+  font-size: 10.6px;
+  color: #94A3B8;
+  flex: 1;
+  line-height: 1.3;
+}
+
+.power-orb {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 3px solid rgba(29, 161, 242, 0.28);
+  background: #1DA1F2;
+  color: #FFFFFF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.12s, background 0.15s, border-color 0.15s;
+}
+
+.power-orb:hover {
+  transform: scale(1.04);
+}
+
+.power-orb.connected {
+  background: #10B981;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+/* Server Browser */
+.search-input, .dark-input, .dark-select {
+  width: 100%;
+  background: #14171D;
+  border: 1px solid #2E3542;
+  border-radius: 6px;
+  color: #FFFFFF;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  outline: none;
+  user-select: text;
+}
+
+.search-input:focus, .dark-input:focus, .dark-select:focus {
+  border-color: #38BDF8;
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.action-btn {
+  background: #1DA1F2;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action-btn.secondary {
+  background: #242A35;
+  color: #CBD5E1;
+}
+
+.action-btn.emerald {
+  background: #10B981;
+}
+
+.server-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.srv-row {
+  background: #191C22;
+  border: 1px solid #252A33;
+  border-radius: 7px;
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.srv-row.selected {
+  background: #1E2C3E;
+  border-color: #1DA1F2;
+}
+
+.srv-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.srv-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.srv-sub {
+  font-size: 10px;
+  color: #8A93A2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ping-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: #38BDF8;
+  background: #242A35;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Diagnostics & Logs */
+.stat-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.big-stat {
+  font-size: 16.5px;
+  font-weight: 800;
+  color: #38BDF8;
+  margin-top: 3px;
+}
+
+.sub-stat {
+  font-size: 10px;
+  color: #8A93A2;
+}
+
+.log-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  max-height: 360px;
+}
+
+.log-item {
+  background: #181C24;
+  border: 1px solid #242934;
+  border-radius: 5px;
+  padding: 4px 7px;
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.log-ts {
+  font-family: Consolas, monospace;
+  color: #7A8494;
+  margin-right: 5px;
+}
+
+.log-cat {
+  font-weight: 700;
+  color: #38BDF8;
+  margin-right: 5px;
+}
+
+/* Settings & About */
+.chk-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11.2px;
+  color: #DCE3EE;
+  margin-top: 6px;
+  cursor: pointer;
+}
+
+.about-link {
+  color: #38BDF8;
+  text-decoration: none;
+  font-size: 11.5px;
+}
+
+.about-link:hover {
+  text-decoration: underline;
+}
+

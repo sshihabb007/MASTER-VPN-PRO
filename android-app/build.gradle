@@ -1,0 +1,19 @@
+// Top-level Gradle build file for Shihab Shield VPN Android Edition
+// Engineered by Mehedi Hasan Shihab (sshihabb007)
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.2.2'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+

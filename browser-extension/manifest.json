@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Shihab Shield VPN — Open Pro",
+  "short_name": "Shihab Shield VPN",
+  "version": "1.2.0",
+  "description": "Open-Source Browser VPN & Proxy Shield for Chrome & Brave: 70+ Country Desktop Tunnel Sync, Standalone Proxy PAC, Split-Tunneling, 3D Globe & Leak Audit by Mehedi Hasan Shihab.",
+  "author": "Mehedi Hasan Shihab (sshihabb007)",
+  "permissions": [
+    "proxy",
+    "storage",
+    "privacy",
+    "alarms",
+    "tabs",
+    "webRequest",
+    "webRequestAuthProvider"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Shihab Shield VPN — Open Pro",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
+
