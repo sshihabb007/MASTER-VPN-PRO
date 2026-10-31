@@ -29,21 +29,56 @@ jobs:
           python-version: "3.12"
 
       - name: Setup Java 17 (Temurin) for Android SDK & APK Signing
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: "temurin"
           java-version: "17"
 
-      - name: Setup Android SDK (API 34 + Build-Tools 34.0.0)
-        uses: android-actions/setup-android@v3
-
-      - name: Ensure Android Platform 34 & Build-Tools 34.0.0 Installed
+      - name: Provision Android SDK (API 34 + Build-Tools 34.0.0)
         shell: pwsh
         run: |
-          $SdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { $env:ANDROID_SDK_ROOT }
+          $SdkRoot = if ($env:ANDROID_HOME -and (Test-Path $env:ANDROID_HOME)) {
+            $env:ANDROID_HOME
+          } elseif (Test-Path "C:\Android\android-sdk") {
+            "C:\Android\android-sdk"
+          } else {
+            Join-Path $env:RUNNER_TEMP "android-sdk"
+          }
+
+          New-Item -ItemType Directory -Force -Path $SdkRoot | Out-Null
+          "ANDROID_HOME=$SdkRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding UTF8
+          "ANDROID_SDK_ROOT=$SdkRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding UTF8
+          $env:ANDROID_HOME = $SdkRoot
+          $env:ANDROID_SDK_ROOT = $SdkRoot
+
+          $SdkManager = Get-ChildItem -Path (Join-Path $SdkRoot "cmdline-tools") -Recurse -Filter "sdkmanager.bat" -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+
+          if (-not $SdkManager) {
+            Write-Host "Downloading official Google Android commandlinetools for Windows..."
+            $ZipPath = Join-Path $env:RUNNER_TEMP "cmdline-tools.zip"
+            $ExtractDir = Join-Path $env:RUNNER_TEMP "cmdline-extract"
+            Invoke-WebRequest -Uri "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip" -OutFile $ZipPath
+            Expand-Archive -LiteralPath $ZipPath -DestinationPath $ExtractDir -Force
+            $LatestDir = Join-Path $SdkRoot "cmdline-tools\latest"
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $LatestDir) | Out-Null
+            if (Test-Path $LatestDir) { Remove-Item -LiteralPath $LatestDir -Recurse -Force }
+            Move-Item -LiteralPath (Join-Path $ExtractDir "cmdline-tools") -Destination $LatestDir -Force
+            $SdkManager = Join-Path $LatestDir "bin\sdkmanager.bat"
+          }
+
           if (-not (Test-Path (Join-Path $SdkRoot "platforms\android-34\android.jar")) -or
               -not (Test-Path (Join-Path $SdkRoot "build-tools\34.0.0\aapt2.exe"))) {
-            "y`ny`ny`ny`ny`n" | sdkmanager "platforms;android-34" "build-tools;34.0.0"
+            Write-Host "Accepting Android SDK licenses and installing platforms;android-34 + build-tools;34.0.0..."
+            $prevEap = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            ("y`r`n" * 30) | & $SdkManager "--sdk_root=$SdkRoot" --licenses *> $null
+            ("y`r`n" * 10) | & $SdkManager "--sdk_root=$SdkRoot" "platforms;android-34" "build-tools;34.0.0"
+            $sdkExit = $LASTEXITCODE
+            $ErrorActionPreference = $prevEap
+            if ($sdkExit -ne 0) {
+              throw "sdkmanager failed with exit code $sdkExit"
+            }
           }
 
       - name: Compile Windows Portable & Setup Installer via build.ps1
